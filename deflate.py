@@ -265,7 +265,7 @@ def deflate(i_mode, o_done, i_data, o_progress, o_byte, i_addr, clk, reset):
             raise Error("width > 9")
         if d > ((1 << width) - 1):
             raise Error("too big")
-        print("put_adv:", d, width, do, doo, di, dio)
+        # print("put_adv:", d, width, do, doo, di, dio)
         pshift = (doo + width) > 8
         # print("pshift: ", pshift)
         if pshift:
@@ -513,7 +513,7 @@ def deflate(i_mode, o_done, i_data, o_progress, o_byte, i_addr, clk, reset):
                 else:
                     bdata = b1adler
                     # Fix this when > 1 byte output:
-                    print("cs1", bdata)
+                    # print("cs1", bdata)
                     adler1_next = (adler1 + bdata) % 65521
                     adler1.next = adler1_next
                     adler2.next = (adler2 + ladler1) % 65521
@@ -548,7 +548,7 @@ def deflate(i_mode, o_done, i_data, o_progress, o_byte, i_addr, clk, reset):
                         obyte.next = put(outcode, 5 + extra_bits)
                         put_adv(outcode, 5 + extra_bits)
                         #state.next = d_state.CSTATIC
-                        cur_i.next = di - 2
+                        cur_i.next = di - length + 1
                         state.next = d_state.CHECKSUM
                     else:
                         cur_i.next = cur_i + 1
@@ -556,7 +556,7 @@ def deflate(i_mode, o_done, i_data, o_progress, o_byte, i_addr, clk, reset):
             elif state == d_state.CHECKSUM:
 
                 if cur_i < di:
-                    print("CHECKSUM", cur_i, di, iram[cur_i])
+                    # print("CHECKSUM", cur_i, di, iram[cur_i])
                     bdata = iram[cur_i]
                     adler1_next = (adler1 + bdata) % 65521
                     adler1.next = adler1_next
@@ -579,9 +579,14 @@ def deflate(i_mode, o_done, i_data, o_progress, o_byte, i_addr, clk, reset):
                         if iram[cur_search] == b1 and \
                                 iram[cur_search+1] == b2 and \
                                 iram[cur_search+2] == b3:
-                            print("found:", cur_search, di, isize)
                             # Length is 3 code
                             lencode = 257
+                            match = 3
+                            if di < isize - 4 and \
+                                    iram[cur_search+3] == iram[di + 3]:
+                                lencode = 258
+                                match = 4
+                            print("found:", cur_search, di, isize, match)
                             outlen = codeLength[lencode]
                             outbits = code_bits[lencode]
                             # print("BITS:", outlen, outbits)
@@ -593,8 +598,9 @@ def deflate(i_mode, o_done, i_data, o_progress, o_byte, i_addr, clk, reset):
                             # print("distance", distance)
                             cur_search.next = distance
                             cur_i.next = 0
-                            adv(24)
-                            cur_cstatic.next = cur_cstatic + 2
+                            adv(match * 8)
+                            cur_cstatic.next = cur_cstatic + match - 1
+                            length.next = match
                             state.next = d_state.DISTANCE
                         else:
                             cur_search.next = cur_search - 1
@@ -603,7 +609,7 @@ def deflate(i_mode, o_done, i_data, o_progress, o_byte, i_addr, clk, reset):
                         adv(8)
                         outlen = codeLength[bdata]
                         outbits = code_bits[bdata]
-                        print("CBITS:", bdata, outlen, outbits)
+                        # print("CBITS:", bdata, outlen, outbits)
                         oaddr.next = do
                         obyte.next = put(outbits, outlen)
                         put_adv(outbits, outlen)
@@ -1028,7 +1034,7 @@ def deflate(i_mode, o_done, i_data, o_progress, o_byte, i_addr, clk, reset):
                             state.next = d_state.IDLE
                     else:
                         if code < EndOfBlock:
-                            print("B:", code, di, do)
+                            # print("B:", code, di, do)
                             oaddr.next = do
                             obyte.next = code
                             o_progress.next = do + 1
@@ -1056,7 +1062,7 @@ def deflate(i_mode, o_done, i_data, o_progress, o_byte, i_addr, clk, reset):
                                 moreBits = ExtraDistanceBits[distanceCode
                                                                 >> 1]
                                 distance += get4(extraLength + 5, moreBits)
-                                print("distance2", distance)
+                                # print("distance2", distance)
                                 adv(extraLength + 5 + moreBits)
                                 # print("adv", extraLength + 5 + moreBits)
                                 offset.next = do - distance

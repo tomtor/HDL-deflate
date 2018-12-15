@@ -180,7 +180,7 @@ def deflate(i_mode, o_done, i_data, o_progress, o_byte, i_addr, clk, reset):
             b2.next = 0
             b3.next = 0
             b4.next = 0
-        elif not filled and nb == 4:
+        elif not filled and nb == 4 and di - old_di <= 4:
             delta = di - old_di
             if delta == 1:
                 # print("delta == 1")
@@ -194,16 +194,18 @@ def deflate(i_mode, o_done, i_data, o_progress, o_byte, i_addr, clk, reset):
                 b1adler.next = b3
                 b2.next = b4
                 b3.next = iram[di+2]
+                nb.next = 3
             elif delta == 3:
                 b1.next = b4
                 b1adler.next = b4
                 b2.next = iram[di+1]
+                nb.next = 2
             elif delta == 4:
                 b1.next = iram[di]
                 b1adler.next = iram[di]
+                nb.next = 1
             else:
-                delta = 1  # Adjust delta for next line calculation
-            nb.next = nb - delta + 1  # + 1 because we read 1 byte
+                pass
         elif not filled or nb == 0:
             # print("nb.next = 1")
             b1.next = iram[di]
@@ -582,10 +584,35 @@ def deflate(i_mode, o_done, i_data, o_progress, o_byte, i_addr, clk, reset):
                             # Length is 3 code
                             lencode = 257
                             match = 3
+
                             if di < isize - 4 and \
                                     iram[cur_search+3] == iram[di + 3]:
                                 lencode = 258
                                 match = 4
+                                if di < isize - 5 and \
+                                        iram[cur_search+4] == iram[di + 4]:
+                                    lencode = 259
+                                    match = 5
+                                    if di < isize - 6 and \
+                                            iram[cur_search+5] == iram[di + 5]:
+                                        lencode = 260
+                                        match = 6
+                                        if di < isize - 7 and \
+                                                iram[cur_search+6] == iram[di + 6]:
+                                            lencode = 261
+                                            match = 7
+                                            if di < isize - 8 and \
+                                                    iram[cur_search+7] == iram[di + 7]:
+                                                lencode = 262
+                                                match = 8
+                                                if di < isize - 9 and \
+                                                        iram[cur_search+8] == iram[di + 8]:
+                                                    lencode = 263
+                                                    match = 9
+                                                    if di < isize - 10 and \
+                                                            iram[cur_search+9] == iram[di + 9]:
+                                                        lencode = 264
+                                                        match = 10
                             print("found:", cur_search, di, isize, match)
                             outlen = codeLength[lencode]
                             outbits = code_bits[lencode]

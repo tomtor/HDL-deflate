@@ -133,6 +133,7 @@ def deflate(i_mode, o_done, i_data, o_progress, o_byte, i_addr, clk, reset):
     do = Signal(intbv()[LBSIZE:])
     doo = Signal(intbv()[3:])
 
+    """
     b1 = Signal(intbv()[32:])
     b2 = Signal(intbv()[24:])
     b3 = Signal(intbv()[16:])
@@ -144,7 +145,7 @@ def deflate(i_mode, o_done, i_data, o_progress, o_byte, i_addr, clk, reset):
     b4 = Signal(intbv()[8:])
 
     b41 = ConcatSignal(b4, b3, b2, b1)
-    """
+    b41._markUsed()
 
     nb = Signal(intbv()[3:])
     b1adler = Signal(intbv()[8:])
@@ -233,12 +234,11 @@ def deflate(i_mode, o_done, i_data, o_progress, o_byte, i_addr, clk, reset):
         # bb3 = intbv(b3.val)[24:]
         # bb2 = intbv(b2.val)[16:]
         # print("get4", b1,b2,b3,b4)
+        """
         return (((b4 << 24) | (b3 << 16) | (b2 << 8) | b1) >>
             (dio + boffset)) & ((1 << width) - 1)
         """
-        print("b41", b41)
         return (b41 >> (dio + boffset)) & ((1 << width) - 1)
-        """
         # this fails in MyHDL:
         # return concat(b4, b3, b2, b1)(dio + offset + width, dio + boffset)
 

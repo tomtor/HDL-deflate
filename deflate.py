@@ -17,10 +17,10 @@ from myhdl import always, block, Signal, intbv, Error, ResetSignal, \
 
 IDLE, RESET, WRITE, READ, STARTC, STARTD = range(6)
 
-OBSIZE = 8192
-IBSIZE = 2048
+OBSIZE = 8192   # Size of output buffer (BRAM)
+IBSIZE = 2048   # Size of input buffer (LUT-RAM)
 
-CWINDOW = 32
+CWINDOW = 32    # Search window for compression
 
 if OBSIZE > IBSIZE:
     LBSIZE = log2(OBSIZE)

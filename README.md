@@ -6,3 +6,11 @@ This design is implemented in MyHDL (www.myhdl.org) and can be translated to Ver
 It has been verified in Icarus, Xilinx Vivado and on a physical Xilinx device (Digilent Arty).
 
 Usage should be clear from the test bench in test_deflate.py.
+
+# Tunable parameters
+
+    OBSIZE = 8192   # Size of output buffer (BRAM)
+    IBSIZE = 2048   # Size of input buffer (LUT-RAM)
+
+    CWINDOW = 32    # Search window for compression
+

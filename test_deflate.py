@@ -17,7 +17,8 @@ COSIMULATION = False
 if not COSIMULATION:
     from deflate import deflate
 else:
-    def deflate(i_mode, o_done, i_data, o_progress, o_byte, i_addr, clk, reset):
+    def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress,
+                o_byte, i_addr, clk, reset):
         print("Cosimulation")
         cmd = "iverilog -o deflate " + \
               "deflate.v " + \
@@ -25,7 +26,8 @@ else:
         os.system(cmd)
         return Cosimulation("vvp -m ./myhdl deflate",
                             i_mode=i_mode, o_done=o_done,
-                            i_data=i_data, o_progress=o_progress,
+                            i_data=i_data, o_iprogress=o_iprogress,
+                            o_oprogress=o_oprogress,
                             o_byte=o_byte, i_addr=i_addr,
                             clk=clk, reset=reset)
 
@@ -59,8 +61,8 @@ class TestDeflate(unittest.TestCase):
 
     def testMain(self):
 
-        def test_decompress(i_mode, o_done, i_data, o_progress,
-                            o_byte, i_addr, clk, reset):
+        def test_decompress(i_mode, o_done, i_data, o_iprogress,
+                            o_oprogress, o_byte, i_addr, clk, reset):
 
             def tick():
                 clk.next = not clk
@@ -91,7 +93,7 @@ class TestDeflate(unittest.TestCase):
             i_mode.next = WRITE
             i = 0
             while i < len(zl_data):
-                if o_progress > i - MAXW:
+                if o_iprogress > i - MAXW:
                     print("write", i)
                     i_data.next = zl_data[i]
                     i_addr.next = i
@@ -134,7 +136,7 @@ class TestDeflate(unittest.TestCase):
                 yield delay(5)
             print(now())
 
-            last = o_progress
+            last = o_oprogress
             print("GOT", last)
             i_mode.next = READ
             d_data = []
@@ -183,7 +185,7 @@ class TestDeflate(unittest.TestCase):
 
             # raise Error("STOP")
 
-            last = o_progress
+            last = o_oprogress
             print("last", last)
             i_mode.next = READ
             c_data = []
@@ -230,7 +232,7 @@ class TestDeflate(unittest.TestCase):
                 yield delay(5)
             print(now())
 
-            last = o_progress
+            last = o_oprogress
             i_mode.next = READ
             d_data = []
             for i in range(last):
@@ -259,17 +261,18 @@ class TestDeflate(unittest.TestCase):
 
         i_data = Signal(intbv()[8:])
         o_byte = Signal(intbv()[8:])
-        o_progress = Signal(intbv()[LBSIZE:])
+        o_iprogress = Signal(intbv()[LBSIZE:])
+        o_oprogress = Signal(intbv()[LBSIZE:])
         i_addr = Signal(intbv()[LBSIZE:])
 
         clk = Signal(bool(0))
         reset = ResetSignal(1, 0, True)
 
-        dut = deflate(i_mode, o_done, i_data, o_progress, o_byte, i_addr,
-                      clk, reset)
+        dut = deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress,
+                      o_byte, i_addr, clk, reset)
 
-        check = test(i_mode, o_done, i_data, o_progress, o_byte, i_addr,
-                     clk, reset)
+        check = test(i_mode, o_done, i_data, o_iprogress, o_oprogress,
+                     o_byte, i_addr, clk, reset)
         sim = Simulation(dut, check)
         # traceSignals(dut)
         sim.run(quiet=1)
@@ -292,14 +295,15 @@ def test_deflate_bench(i_clk, o_led, led0_g, led1_b, led2_r):
     i_data = Signal(intbv()[8:])
     o_byte = Signal(intbv()[8:])
     u_data = Signal(intbv()[8:])
-    o_progress = Signal(intbv()[LBSIZE:])
+    o_iprogress = Signal(intbv()[LBSIZE:])
+    o_oprogress = Signal(intbv()[LBSIZE:])
     resultlen = Signal(intbv()[LBSIZE:])
     i_addr = Signal(intbv()[LBSIZE:])
 
     reset = ResetSignal(1, 0, True)
 
-    dut = deflate(i_mode, o_done, i_data, o_progress, o_byte, i_addr,
-                  i_clk, reset)
+    dut = deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress,
+                  o_byte, i_addr, i_clk, reset)
 
     tb_state = enum('RESET', 'WRITE', 'DECOMPRESS', 'WAIT', 'VERIFY', 'PAUSE',
                     'CWRITE', 'COMPRESS', 'CWAIT', 'CRESULT', 'VWRITE',
@@ -381,8 +385,8 @@ def test_deflate_bench(i_clk, o_led, led0_g, led1_b, led2_r):
                 if scounter == 0:
                     led1_b.next = not led1_b
             elif o_done:
-                print("result len", o_progress)
-                resultlen.next = o_progress
+                print("result len", o_oprogress)
+                resultlen.next = o_oprogress
                 tstate.next = tb_state.VERIFY
                 tbi.next = 0
                 i_addr.next = 0
@@ -457,8 +461,8 @@ def test_deflate_bench(i_clk, o_led, led0_g, led1_b, led2_r):
                 if scounter == 0:
                     led2_r.next = not led2_r
             elif o_done:
-                print("result len", o_progress)
-                resultlen.next = o_progress
+                print("result len", o_oprogress)
+                resultlen.next = o_oprogress
                 tstate.next = tb_state.CRESULT
                 tbi.next = 0
                 i_addr.next = 0
@@ -509,7 +513,7 @@ def test_deflate_bench(i_clk, o_led, led0_g, led1_b, led2_r):
                 print("WAIT DECOMPRESS VERIFY")
                 i_mode.next = IDLE
             elif o_done:
-                print("DONE DECOMPRESS VERIFY", o_progress)
+                print("DONE DECOMPRESS VERIFY", o_oprogress)
                 tstate.next = tb_state.CVERIFY
                 if scounter == 0:
                     led1_b.next = not led1_b

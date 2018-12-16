@@ -51,7 +51,7 @@ ExtraDistanceBits = (0, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13)
 
 
 @block
-def deflate(i_mode, o_done, i_data, o_progress, o_byte, i_addr, clk, reset):
+def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte, i_addr, clk, reset):
 
     """ Deflate (de)compress
 
@@ -250,7 +250,7 @@ def deflate(i_mode, o_done, i_data, o_progress, o_byte, i_addr, clk, reset):
         nshift = ((dio + width) >> 3)
         # print("nshift: ", nshift)
 
-        o_progress.next = di
+        o_iprogress.next = di
         dio.next = (dio + width) & 0x7
         di.next = di + nshift
 
@@ -281,7 +281,7 @@ def deflate(i_mode, o_done, i_data, o_progress, o_byte, i_addr, clk, reset):
             ob1.next = ob1 | (d << doo)
             # print("ob1.next", ob1 | (d << doo))
         do.next = do + pshift
-        # o_progress.next = do + pshift
+        o_oprogress.next = do + pshift
         doo_next = (doo + width) & 0x7
         if doo_next == 0:
             flush.next = True
@@ -291,7 +291,7 @@ def deflate(i_mode, o_done, i_data, o_progress, o_byte, i_addr, clk, reset):
         # print("FLUSH")
         flush.next = False
         ob1.next = 0
-        # o_progress.next = do + 1
+        o_oprogress.next = do + 1
         do.next = do + 1
 
     def rev_bits(b, nb):
@@ -364,7 +364,8 @@ def deflate(i_mode, o_done, i_data, o_progress, o_byte, i_addr, clk, reset):
                     do_compress.next = True
                     method.next = 1
                     o_done.next = False
-                    o_progress.next = 0
+                    o_iprogress.next = 0
+                    o_oprogress.next = 0
                     di.next = 0
                     dio.next = 0
                     do.next = 0
@@ -510,7 +511,7 @@ def deflate(i_mode, o_done, i_data, o_progress, o_byte, i_addr, clk, reset):
                     elif cur_cstatic - 3 == isize + 7:
                         print("EOF finish", do)
                         o_done.next = True
-                        o_progress.next = do + 1
+                        o_oprogress.next = do + 1
                         wait_data.next = True
                         state.next = d_state.IDLE
                     else:
@@ -1061,7 +1062,7 @@ def deflate(i_mode, o_done, i_data, o_progress, o_byte, i_addr, clk, reset):
                             state.next = d_state.HEADER
                         else:
                             o_done.next = True
-                            o_progress.next = do
+                            o_oprogress.next = do
                             wait_data.next = True
                             state.next = d_state.IDLE
                     else:
@@ -1069,7 +1070,7 @@ def deflate(i_mode, o_done, i_data, o_progress, o_byte, i_addr, clk, reset):
                             # print("B:", code, di, do)
                             oaddr.next = do
                             obyte.next = code
-                            # o_progress.next = do + 1
+                            o_oprogress.next = do + 1
                             do.next = do + 1
                             cur_next.next = 0
                             state.next = d_state.NEXT
@@ -1119,11 +1120,11 @@ def deflate(i_mode, o_done, i_data, o_progress, o_byte, i_addr, clk, reset):
                         adv(8)
                         cur_i.next = cur_i + 1
                         do.next = do + 1
-                        # o_progress.next = do + 1
+                        o_oprogress.next = do + 1
                     elif not final:
                         state.next = d_state.HEADER
                     else:
-                        o_progress.next = do # + 1
+                        o_oprogress.next = do # + 1
                         o_done.next = True
                         wait_data.next = True
                         state.next = d_state.IDLE
@@ -1134,13 +1135,13 @@ def deflate(i_mode, o_done, i_data, o_progress, o_byte, i_addr, clk, reset):
                         # print("byte", orbyte)
                         oaddr.next = do
                         obyte.next = orbyte
-                        # o_progress.next = do + 1
+                        o_oprogress.next = do + 1
                         do.next = do + 1
                 else:
                     oaddr.next = do
                     obyte.next = orbyte
                     do.next = do + 1
-                    # o_progress.next = do + 1
+                    o_oprogress.next = do + 1
                     cur_next.next = 0
                     state.next = d_state.NEXT
 
@@ -1155,6 +1156,7 @@ def deflate(i_mode, o_done, i_data, o_progress, o_byte, i_addr, clk, reset):
 if __name__ == "__main__":
     d = deflate(Signal(intbv()[3:]), Signal(bool(0)),
                 Signal(intbv()[8:]), Signal(intbv()[LBSIZE:]),
+                Signal(intbv()[LBSIZE:]),
                 Signal(intbv()[8:]), Signal(intbv()[LBSIZE:]),
                 Signal(bool(0)), ResetSignal(1, 0, True))
     d.convert()

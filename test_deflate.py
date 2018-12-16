@@ -7,7 +7,9 @@ from myhdl import delay, now, Signal, intbv, ResetSignal, Simulation, \
                   Cosimulation, block, instance, StopSimulation, modbv, \
                   always, always_seq, always_comb, enum, Error
 
-from deflate import IDLE, WRITE, READ, STARTC, STARTD, LBSIZE, IBSIZE
+from deflate import IDLE, WRITE, READ, STARTC, STARTD, LBSIZE, IBSIZE, CWINDOW
+
+MAXW = 2 * CWINDOW
 
 COSIMULATION = True
 COSIMULATION = False
@@ -63,6 +65,11 @@ class TestDeflate(unittest.TestCase):
             def tick():
                 clk.next = not clk
 
+            print("")
+            print("==========================")
+            print("START TEST MODE", mode)
+            print("==========================")
+
             b_data, zl_data = test_data(mode)
 
             reset.next = 0
@@ -72,6 +79,33 @@ class TestDeflate(unittest.TestCase):
             tick()
             yield delay(5)
 
+            print("STARTD")
+            i_mode.next = STARTD
+            tick()
+            yield delay(5)
+            tick()
+            yield delay(5)
+            i_mode.next = IDLE
+
+            print("WRITE")
+            i_mode.next = WRITE
+            i = 0
+            while i < len(zl_data):
+                if o_progress > i - MAXW:
+                    print("write", i)
+                    i_data.next = zl_data[i]
+                    i_addr.next = i
+                    i = i + 1
+                else:
+                    print("Wait for space")
+                tick()
+                yield delay(5)
+                tick()
+                yield delay(5)
+            i_mode.next = IDLE
+            print("Wrote input, wait for end of decompression")
+
+            """
             print("WRITE")
             i_mode.next = WRITE
             for i in range(len(zl_data)):
@@ -90,6 +124,7 @@ class TestDeflate(unittest.TestCase):
             tick()
             yield delay(5)
             i_mode.next = IDLE
+            """
 
             print(now())
             while not o_done:
@@ -117,6 +152,8 @@ class TestDeflate(unittest.TestCase):
             self.assertEqual(b_data, d_data, "decompress does NOT match")
             print(len(d_data), len(zl_data))
 
+            """
+            """
             print("==========COMPRESS TEST=========")
 
             i_mode.next = WRITE

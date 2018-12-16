@@ -17,15 +17,17 @@ from myhdl import always, block, Signal, intbv, Error, ResetSignal, \
 
 IDLE, RESET, WRITE, READ, STARTC, STARTD = range(6)
 
-OBSIZE = 8192   # Size of output buffer (BRAM)
-IBSIZE = 256 # 2048   # Size of input buffer (LUT-RAM)
-
 CWINDOW = 32    # Search window for compression
+
+OBSIZE = 8192   # Size of output buffer (BRAM)
+IBSIZE = 4 * CWINDOW  # 2048   # Size of input buffer (LUT-RAM)
 
 if OBSIZE > IBSIZE:
     LBSIZE = log2(OBSIZE)
 else:
     LBSIZE = log2(IBSIZE)
+
+IBS = (1 << int(log2(IBSIZE))) - 1
 
 d_state = enum('IDLE', 'HEADER', 'BL', 'READBL', 'REPEAT', 'DISTTREE', 'INIT3',
                'HF1', 'HF1INIT', 'HF2', 'HF3', 'HF4', 'STATIC', 'D_NEXT',
@@ -121,7 +123,8 @@ def deflate(i_mode, o_done, i_data, o_progress, o_byte, i_addr, clk, reset):
     spread_i = Signal(intbv()[9:])
     cur_HF1 = Signal(intbv()[10:])
     cur_cstatic = Signal(intbv()[LBSIZE:])
-    cur_search = Signal(intbv(min=-256,max=IBSIZE))
+    cur_search = Signal(intbv(min=-CWINDOW,max=IBSIZE))
+    cur_dist = Signal(intbv(min=-CWINDOW,max=IBSIZE))
     cur_next = Signal(intbv()[5:])
 
     length = Signal(intbv()[LBSIZE:])
@@ -167,7 +170,7 @@ def deflate(i_mode, o_done, i_data, o_progress, o_byte, i_addr, clk, reset):
 
     @always_seq(clk.posedge, reset)
     def fill_buf():
-        if not reset or wait_data:
+        if not reset: # or wait_data:
             nb.next = 0
             old_di.next = 0
             b1.next = 0
@@ -175,6 +178,20 @@ def deflate(i_mode, o_done, i_data, o_progress, o_byte, i_addr, clk, reset):
             b2.next = 0
             b3.next = 0
             b4.next = 0
+        # elif di >= isize - 4: # isize < 4:
+        else:
+            if isize < 4:
+                pass
+            else:
+                # print("FILL", di, isize)
+                nb.next = 4
+                b1.next = iram[di & IBS]
+                b1adler.next = iram[di & IBS]
+                b2.next = iram[di+1 & IBS]
+                b3.next = iram[di+2 & IBS]
+                b4.next = iram[di+3 & IBS]
+                # old_di.next = di
+        """
         elif not filled and nb == 4 and di - old_di <= 4:
             delta = di - old_di
             if delta == 1:
@@ -183,41 +200,42 @@ def deflate(i_mode, o_done, i_data, o_progress, o_byte, i_addr, clk, reset):
                 b1adler.next = b2
                 b2.next = b3
                 b3.next = b4
-                b4.next = iram[di+3]
+                b4.next = iram[di+3 & IBS]
             elif delta == 2:
                 b1.next = b3
                 b1adler.next = b3
                 b2.next = b4
-                b3.next = iram[di+2]
+                b3.next = iram[di+2 & IBS]
                 nb.next = 3
             elif delta == 3:
                 b1.next = b4
                 b1adler.next = b4
-                b2.next = iram[di+1]
+                b2.next = iram[di+1 & IBS]
                 nb.next = 2
             elif delta == 4:
-                b1.next = iram[di]
-                b1adler.next = iram[di]
+                b1.next = iram[di & IBS]
+                b1adler.next = iram[di & IBS]
                 nb.next = 1
             else:
                 pass
         elif not filled or nb == 0:
             # print("nb.next = 1")
-            b1.next = iram[di]
-            b1adler.next = iram[di]
+            b1.next = iram[di & IBS]
+            b1adler.next = iram[di & IBS]
             nb.next = 1
         elif not filled or nb == 1:
-            b2.next = iram[di+1]
+            b2.next = iram[di+1 & IBS]
             nb.next = 2
         elif not filled or nb == 2:
-            b3.next = iram[di+2]
+            b3.next = iram[di+2 & IBS]
             nb.next = 3
         elif not filled or nb == 3:
-            b4.next = iram[di+3]
+            b4.next = iram[di+3 & IBS]
             nb.next = 4
         else:
             pass
         old_di.next = di
+    """
 
     def get4(boffset, width):
         if nb != 4:
@@ -232,6 +250,7 @@ def deflate(i_mode, o_done, i_data, o_progress, o_byte, i_addr, clk, reset):
         nshift = ((dio + width) >> 3)
         # print("nshift: ", nshift)
 
+        o_progress.next = di
         dio.next = (dio + width) & 0x7
         di.next = di + nshift
 
@@ -262,7 +281,7 @@ def deflate(i_mode, o_done, i_data, o_progress, o_byte, i_addr, clk, reset):
             ob1.next = ob1 | (d << doo)
             # print("ob1.next", ob1 | (d << doo))
         do.next = do + pshift
-        o_progress.next = do + pshift
+        # o_progress.next = do + pshift
         doo_next = (doo + width) & 0x7
         if doo_next == 0:
             flush.next = True
@@ -272,7 +291,7 @@ def deflate(i_mode, o_done, i_data, o_progress, o_byte, i_addr, clk, reset):
         # print("FLUSH")
         flush.next = False
         ob1.next = 0
-        o_progress.next = do + 1
+        # o_progress.next = do + 1
         do.next = do + 1
 
     def rev_bits(b, nb):
@@ -309,7 +328,7 @@ def deflate(i_mode, o_done, i_data, o_progress, o_byte, i_addr, clk, reset):
                 if i_mode == WRITE:
 
                     # print("WRITE:", i_addr, i_data)
-                    iram[i_addr].next = i_data
+                    iram[i_addr & IBS].next = i_data
                     isize.next = i_addr
                     # wait_data.next = True
 
@@ -345,6 +364,7 @@ def deflate(i_mode, o_done, i_data, o_progress, o_byte, i_addr, clk, reset):
                     do_compress.next = True
                     method.next = 1
                     o_done.next = False
+                    o_progress.next = 0
                     di.next = 0
                     dio.next = 0
                     do.next = 0
@@ -375,15 +395,15 @@ def deflate(i_mode, o_done, i_data, o_progress, o_byte, i_addr, clk, reset):
                     pass
                 # Read block header
                 elif di == 0:
-                    print(iram[di])
-                    if iram[di] == 0x78:
+                    print(iram[di & IBS])
+                    if iram[di & IBS] == 0x78:
                         print("deflate mode")
                     else:
                         raise Error("unexpected mode")
                     adv(8)
                 elif di == 1:
-                    print(iram[di])
-                    if iram[di] != 0x9c:
+                    print(iram[di & IBS])
+                    if iram[di & IBS] != 0x9c:
                         raise Error("unexpected level")
                     adv(8)
                 else:
@@ -392,8 +412,8 @@ def deflate(i_mode, o_done, i_data, o_progress, o_byte, i_addr, clk, reset):
                         final.next = True
                     i = get4(1, 2)
                     method.next = i
-                    print("method: %d" % i)
-                    # print(di, dio, nb, b1, b2, b3, b4, i)
+                    print("method", i)
+                    print(di, dio, nb, b1, b2, b3, b4, i, isize)
                     if i == 2:
                         state.next = d_state.BL
                         numCodeLength.next = 0
@@ -516,12 +536,12 @@ def deflate(i_mode, o_done, i_data, o_progress, o_byte, i_addr, clk, reset):
                 if flush:
                     do_flush()
                 else:
-                    # print("DISTANCE", di, do, cur_i, cur_search)
+                    # print("DISTANCE", di, do, cur_i, cur_dist)
                     nextdist = CopyDistance[cur_i+1]
-                    if nextdist > cur_search:
+                    if nextdist > cur_dist:
                         print("Found distance", cur_i)
                         copydist = CopyDistance[cur_i]
-                        extra_dist = cur_search - copydist
+                        extra_dist = cur_dist - copydist
                         # print("extra dist", extra_dist)
                         extra_bits = ExtraDistanceBits[cur_i // 2]
                         # print("extra bits", extra_bits)
@@ -543,7 +563,7 @@ def deflate(i_mode, o_done, i_data, o_progress, o_byte, i_addr, clk, reset):
 
                 if cur_i < di:
                     # print("CHECKSUM", cur_i, di, iram[cur_i])
-                    bdata = iram[cur_i]
+                    bdata = iram[cur_i & IBS]
                     adler1_next = (adler1 + bdata) % 65521
                     adler1.next = adler1_next
                     adler2.next = (adler2 + ladler1) % 65521
@@ -562,39 +582,39 @@ def deflate(i_mode, o_done, i_data, o_progress, o_byte, i_addr, clk, reset):
                     if cur_search >= 0 \
                              and cur_search >= di - CWINDOW \
                              and di >= 3 and di < isize - 3:
-                        if iram[cur_search] == b1 and \
-                                iram[cur_search+1] == b2 and \
-                                iram[cur_search+2] == b3:
+                        if iram[cur_search & IBS] == b1 and \
+                                iram[cur_search+1 & IBS] == b2 and \
+                                iram[cur_search+2 & IBS] == b3:
                             # Length is 3 code
                             lencode = 257
                             match = 3
 
                             if di < isize - 4 and \
-                                    iram[cur_search+3] == iram[di + 3]:
+                                    iram[cur_search+3 & IBS] == iram[di + 3 & IBS]:
                                 lencode = 258
                                 match = 4
                                 if di < isize - 5 and \
-                                        iram[cur_search+4] == iram[di + 4]:
+                                        iram[cur_search+4 & IBS] == iram[di + 4 & IBS]:
                                     lencode = 259
                                     match = 5
                                     if di < isize - 6 and \
-                                            iram[cur_search+5] == iram[di + 5]:
+                                            iram[cur_search+5 & IBS] == iram[di + 5 & IBS]:
                                         lencode = 260
                                         match = 6
                                         if di < isize - 7 and \
-                                                iram[cur_search+6] == iram[di + 6]:
+                                                iram[cur_search+6 & IBS] == iram[di + 6 & IBS]:
                                             lencode = 261
                                             match = 7
                                             if di < isize - 8 and \
-                                                    iram[cur_search+7] == iram[di + 7]:
+                                                    iram[cur_search+7 & IBS] == iram[di + 7 & IBS]:
                                                 lencode = 262
                                                 match = 8
                                                 if di < isize - 9 and \
-                                                        iram[cur_search+8] == iram[di + 8]:
+                                                        iram[cur_search+8 & IBS] == iram[di + 8 & IBS]:
                                                     lencode = 263
                                                     match = 9
                                                     if di < isize - 10 and \
-                                                            iram[cur_search+9] == iram[di + 9]:
+                                                            iram[cur_search+9 & IBS] == iram[di + 9 & IBS]:
                                                         lencode = 264
                                                         match = 10
                             print("found:", cur_search, di, isize, match)
@@ -607,7 +627,7 @@ def deflate(i_mode, o_done, i_data, o_progress, o_byte, i_addr, clk, reset):
 
                             distance = di - cur_search
                             # print("distance", distance)
-                            cur_search.next = distance
+                            cur_dist.next = distance
                             cur_i.next = 0
                             adv(match * 8)
                             cur_cstatic.next = cur_cstatic + match - 1
@@ -1041,6 +1061,7 @@ def deflate(i_mode, o_done, i_data, o_progress, o_byte, i_addr, clk, reset):
                             state.next = d_state.HEADER
                         else:
                             o_done.next = True
+                            o_progress.next = do
                             wait_data.next = True
                             state.next = d_state.IDLE
                     else:
@@ -1048,7 +1069,7 @@ def deflate(i_mode, o_done, i_data, o_progress, o_byte, i_addr, clk, reset):
                             # print("B:", code, di, do)
                             oaddr.next = do
                             obyte.next = code
-                            o_progress.next = do + 1
+                            # o_progress.next = do + 1
                             do.next = do + 1
                             cur_next.next = 0
                             state.next = d_state.NEXT
@@ -1098,10 +1119,11 @@ def deflate(i_mode, o_done, i_data, o_progress, o_byte, i_addr, clk, reset):
                         adv(8)
                         cur_i.next = cur_i + 1
                         do.next = do + 1
-                        o_progress.next = do + 1
+                        # o_progress.next = do + 1
                     elif not final:
                         state.next = d_state.HEADER
                     else:
+                        o_progress.next = do # + 1
                         o_done.next = True
                         wait_data.next = True
                         state.next = d_state.IDLE
@@ -1112,13 +1134,13 @@ def deflate(i_mode, o_done, i_data, o_progress, o_byte, i_addr, clk, reset):
                         # print("byte", orbyte)
                         oaddr.next = do
                         obyte.next = orbyte
-                        o_progress.next = do + 1
+                        # o_progress.next = do + 1
                         do.next = do + 1
                 else:
                     oaddr.next = do
                     obyte.next = orbyte
                     do.next = do + 1
-                    o_progress.next = do + 1
+                    # o_progress.next = do + 1
                     cur_next.next = 0
                     state.next = d_state.NEXT
 

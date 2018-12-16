@@ -14,3 +14,8 @@ Usage should be clear from the test bench in `test_deflate.py`.
 
     CWINDOW = 32    # Search window for compression
 
+One can use a sliding window to reduce the size of the input buffer and the LUT-usage.
+
+The optimal value is 4 * CWINDOW (128 bytes), the compression in the UnitTest in `test_deflate.py` uses
+this strategy.
+

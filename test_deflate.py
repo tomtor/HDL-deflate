@@ -7,7 +7,7 @@ from myhdl import delay, now, Signal, intbv, ResetSignal, Simulation, \
                   Cosimulation, block, instance, StopSimulation, modbv, \
                   always, always_seq, always_comb, enum, Error
 
-from deflate import IDLE, WRITE, READ, STARTC, STARTD, LBSIZE
+from deflate import IDLE, WRITE, READ, STARTC, STARTD, LBSIZE, IBSIZE
 
 COSIMULATION = True
 COSIMULATION = False
@@ -46,6 +46,7 @@ def test_data(m):
         b_data = bytes([random.randrange(0,0x100) for i in range(100)])
     else:
         raise Error("unknown test mode")
+    b_data = b_data[:IBSIZE-4]
     zl_data = zlib.compress(b_data)
     print("From %d to %d bytes" % (len(b_data), len(zl_data)))
     print(zl_data)

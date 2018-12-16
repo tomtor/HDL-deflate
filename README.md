@@ -5,7 +5,7 @@ This design is implemented in MyHDL (www.myhdl.org) and can be translated to Ver
 
 It has been verified in Icarus, Xilinx Vivado and on a physical Xilinx device (Digilent Arty).
 
-Usage should be clear from the test bench in test_deflate.py.
+Usage should be clear from the test bench in `test_deflate.py`.
 
 # Tunable parameters
 

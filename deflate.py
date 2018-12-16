@@ -145,11 +145,9 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte, i_addr, cl
     b41._markUsed()
 
     nb = Signal(intbv()[3:])
-    b1adler = Signal(intbv()[8:])
 
     newnb = Signal(intbv()[3:])
     filled = Signal(bool())
-    wait_data = Signal(bool())
 
     ob1 = Signal(intbv()[8:])
     flush = Signal(bool(0))
@@ -170,11 +168,10 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte, i_addr, cl
 
     @always_seq(clk.posedge, reset)
     def fill_buf():
-        if not reset: # or wait_data:
+        if not reset:
             nb.next = 0
             old_di.next = 0
             b1.next = 0
-            b1adler.next = 0
             b2.next = 0
             b3.next = 0
             b4.next = 0
@@ -186,7 +183,6 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte, i_addr, cl
                 # print("FILL", di, isize)
                 nb.next = 4
                 b1.next = iram[di & IBS]
-                b1adler.next = iram[di & IBS]
                 b2.next = iram[di+1 & IBS]
                 b3.next = iram[di+2 & IBS]
                 b4.next = iram[di+3 & IBS]
@@ -330,7 +326,6 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte, i_addr, cl
                     # print("WRITE:", i_addr, i_data)
                     iram[i_addr & IBS].next = i_data
                     isize.next = i_addr
-                    # wait_data.next = True
 
                 elif i_mode == READ:
 
@@ -348,14 +343,12 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte, i_addr, cl
             print("DEFLATE RESET")
             state.next = d_state.IDLE
             o_done.next = False
-            wait_data.next = True
             # oaddr.next = 0
             # obyte.next = 0
         else:
 
             if state == d_state.IDLE:
 
-                wait_data.next = True
                 ocopy.next = False
 
                 if i_mode == STARTC:
@@ -371,7 +364,6 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte, i_addr, cl
                     do.next = 0
                     doo.next = 0
                     filled.next = True
-                    wait_data.next = False
                     state.next = d_state.STATIC
 
                 elif i_mode == STARTD:
@@ -384,7 +376,6 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte, i_addr, cl
                     do.next = 0
                     doo.next = 0
                     filled.next = True
-                    wait_data.next = False
                     state.next = d_state.HEADER
 
 
@@ -512,13 +503,12 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte, i_addr, cl
                         print("EOF finish", do)
                         o_done.next = True
                         o_oprogress.next = do + 1
-                        wait_data.next = True
                         state.next = d_state.IDLE
                     else:
                         print(cur_cstatic, isize)
                         raise Error("???")
                 else:
-                    bdata = b1adler
+                    bdata = iram[di]
                     # Fix this when > 1 byte output:
                     # print("cs1", bdata)
                     adler1_next = (adler1 + bdata) % 65521
@@ -637,7 +627,7 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte, i_addr, cl
                         else:
                             cur_search.next = cur_search - 1
                     else:
-                        bdata = b1adler
+                        bdata = iram[di]
                         adv(8)
                         outlen = codeLength[bdata]
                         outbits = code_bits[bdata]
@@ -1053,7 +1043,6 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte, i_addr, cl
                     elif di > isize - 3:  # checksum is 4 bytes
                         state.next = d_state.IDLE
                         o_done.next = True
-                        wait_data.next = True
                         print("NO EOF ", di)
                         raise Error("NO EOF!")
                     elif code == EndOfBlock:
@@ -1063,7 +1052,6 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte, i_addr, cl
                         else:
                             o_done.next = True
                             o_oprogress.next = do
-                            wait_data.next = True
                             state.next = d_state.IDLE
                     else:
                         if code < EndOfBlock:
@@ -1126,7 +1114,6 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte, i_addr, cl
                     else:
                         o_oprogress.next = do # + 1
                         o_done.next = True
-                        wait_data.next = True
                         state.next = d_state.IDLE
                 elif cur_i < length + 1:
                     oraddr.next = offset + cur_i

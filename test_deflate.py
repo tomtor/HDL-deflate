@@ -387,10 +387,10 @@ def test_deflate_bench(i_clk, o_led, led0_g, led1_b, led2_r):
             elif o_done:
                 print("result len", o_oprogress)
                 resultlen.next = o_oprogress
-                tstate.next = tb_state.VERIFY
                 tbi.next = 0
                 i_addr.next = 0
                 i_mode.next = READ
+                tstate.next = tb_state.VERIFY
 
         elif tstate == tb_state.VERIFY:
             #print("VERIFY", o_data)
@@ -421,14 +421,14 @@ def test_deflate_bench(i_clk, o_led, led0_g, led1_b, led2_r):
                 tbi.next = 0
                 # state.next = tb_state.PAUSE
                 # state.next = tb_state.CPAUSE
-                tstate.next = tb_state.CWRITE
                 resume.next = 1
+                tstate.next = tb_state.CWRITE
 
         elif tstate == tb_state.PAUSE:
             if resume == 0:
                 print("--------------COMPRESS-------------")
-                tstate.next = tb_state.CWRITE
                 tbi.next = 0
+                tstate.next = tb_state.CWRITE
             else:
                 resume.next = resume + 1
 
@@ -463,10 +463,10 @@ def test_deflate_bench(i_clk, o_led, led0_g, led1_b, led2_r):
             elif o_done:
                 print("result len", o_oprogress)
                 resultlen.next = o_oprogress
-                tstate.next = tb_state.CRESULT
                 tbi.next = 0
                 i_addr.next = 0
                 i_mode.next = READ
+                tstate.next = tb_state.CRESULT
 
         # verify compression
         elif tstate == tb_state.CRESULT:
@@ -483,8 +483,8 @@ def test_deflate_bench(i_clk, o_led, led0_g, led1_b, led2_r):
             else:
                 print("Compress bytes read", resultlen, tbi - 1)
                 i_mode.next = IDLE
-                tstate.next = tb_state.VWRITE
                 tbi.next = 0
+                tstate.next = tb_state.VWRITE
 
         elif tstate == tb_state.VWRITE:
             if tbi < resultlen:
@@ -514,12 +514,12 @@ def test_deflate_bench(i_clk, o_led, led0_g, led1_b, led2_r):
                 i_mode.next = IDLE
             elif o_done:
                 print("DONE DECOMPRESS VERIFY", o_oprogress)
-                tstate.next = tb_state.CVERIFY
                 if scounter == 0:
                     led1_b.next = not led1_b
                 tbi.next = 0
                 i_addr.next = 0
                 i_mode.next = READ
+                tstate.next = tb_state.CVERIFY
 
         elif tstate == tb_state.CVERIFY:
             # print("COMPRESS VERIFY", tbi, o_byte)
@@ -536,8 +536,8 @@ def test_deflate_bench(i_clk, o_led, led0_g, led1_b, led2_r):
                         tstate.next = tb_state.RESET
                         i_mode.next = IDLE
                         print("FAIL", len(UDATA), tbi, cud, o_byte)
-                        tstate.next = tb_state.FAIL
                         raise Error("bad result")
+                        tstate.next = tb_state.FAIL
                 tbi.next = tbi + 1
                 i_addr.next = tbi + 1
             else:
@@ -546,10 +546,10 @@ def test_deflate_bench(i_clk, o_led, led0_g, led1_b, led2_r):
                 led0_g.next = not led0_g
                 led2_r.next = 0
                 i_mode.next = IDLE
-                tstate.next = tb_state.CPAUSE
                 resume.next = 1
                 if SLOWDOWN == 1:
                     raise StopSimulation()
+                tstate.next = tb_state.CPAUSE
 
         elif tstate == tb_state.CPAUSE:
             if resume == 0:

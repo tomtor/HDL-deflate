@@ -199,48 +199,48 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte, i_addr, cl
             b3.next = 0
             b4.next = 0
         else:
-                if isize < 4:
-                    pass
-                elif i_mode == STARTC or i_mode == STARTD:
-                    nb.next = 0
-                elif not filled and nb == 4 and di - old_di <= 4:
-                    delta = di - old_di
-                    if delta == 1:
-                        # print("delta == 1")
-                        b1.next = b2
-                        b2.next = b3
-                        b3.next = b4
-                        b4.next = iram[di+3 & IBS]
-                    elif delta == 2:
-                        b1.next = b3
-                        b2.next = b4
-                        b3.next = iram[di+2 & IBS]
-                        nb.next = 3
-                    elif delta == 3:
-                        b1.next = b4
-                        b2.next = iram[di+1 & IBS]
-                        nb.next = 2
-                    elif delta == 4:
-                        b1.next = iram[di & IBS]
-                        nb.next = 1
-                    else:
-                        pass
-                elif not filled or nb == 0:
-                    # print("nb.next = 1")
-                    b1.next = iram[di & IBS]
-                    nb.next = 1
-                elif not filled or nb == 1:
-                    b2.next = iram[di+1 & IBS]
-                    nb.next = 2
-                elif not filled or nb == 2:
+            if isize < 4:
+                pass
+            elif i_mode == STARTC or i_mode == STARTD:
+                nb.next = 0
+            elif not filled and nb == 4 and di - old_di <= 4:
+                delta = di - old_di
+                if delta == 1:
+                    # print("delta == 1")
+                    b1.next = b2
+                    b2.next = b3
+                    b3.next = b4
+                    b4.next = iram[di+3 & IBS]
+                elif delta == 2:
+                    b1.next = b3
+                    b2.next = b4
                     b3.next = iram[di+2 & IBS]
                     nb.next = 3
-                elif not filled or nb == 3:
-                    b4.next = iram[di+3 & IBS]
-                    nb.next = 4
+                elif delta == 3:
+                    b1.next = b4
+                    b2.next = iram[di+1 & IBS]
+                    nb.next = 2
+                elif delta == 4:
+                    b1.next = iram[di & IBS]
+                    nb.next = 1
                 else:
                     pass
-                old_di.next = di
+            elif not filled or nb == 0:
+                # print("nb.next = 1")
+                b1.next = iram[di & IBS]
+                nb.next = 1
+            elif not filled or nb == 1:
+                b2.next = iram[di+1 & IBS]
+                nb.next = 2
+            elif not filled or nb == 2:
+                b3.next = iram[di+2 & IBS]
+                nb.next = 3
+            elif not filled or nb == 3:
+                b4.next = iram[di+3 & IBS]
+                nb.next = 4
+            else:
+                pass
+            old_di.next = di
 
     def get4(boffset, width):
         if nb != 4:

@@ -166,7 +166,6 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte, i_addr, cl
     def oramread():
         orbyte.next = oram[oraddr]
 
-    """
     @always_seq(clk.posedge, reset)
     def fill_buf():
         if not reset:
@@ -241,6 +240,7 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte, i_addr, cl
             else:
                 pass
             old_di.next = di
+    """
 
     def get4(boffset, width):
         if nb != 4:

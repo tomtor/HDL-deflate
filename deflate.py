@@ -92,7 +92,7 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte, i_addr, cl
     BITBITS = 9
 
     codeLength = [Signal(intbv()[4:]) for _ in range(MaxBitLength+2)]
-    bitLengthCount = [Signal(intbv(0)[9:]) for _ in range(MaxCodeLength+1)]
+    bitLengthCount = [Signal(intbv()[9:]) for _ in range(MaxCodeLength+1)]
     nextCode = [Signal(intbv()[CODEBITS:]) for _ in range(MaxCodeLength)]
     reverse = Signal(intbv()[CODEBITS:])
     HF4_init = Signal(bool())
@@ -166,6 +166,7 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte, i_addr, cl
     def oramread():
         orbyte.next = oram[oraddr]
 
+    """
     @always_seq(clk.posedge, reset)
     def fill_buf():
         if not reset:
@@ -175,10 +176,11 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte, i_addr, cl
             b2.next = 0
             b3.next = 0
             b4.next = 0
-        # elif di >= isize - 4: # isize < 4:
         else:
             if isize < 4:
                 pass
+            elif i_mode == STARTC or i_mode == STARTD:
+                nb.next = 0
             else:
                 # print("FILL", di, isize)
                 nb.next = 4
@@ -186,52 +188,59 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte, i_addr, cl
                 b2.next = iram[di+1 & IBS]
                 b3.next = iram[di+2 & IBS]
                 b4.next = iram[di+3 & IBS]
-                # old_di.next = di
-        """
-        elif not filled and nb == 4 and di - old_di <= 4:
-            delta = di - old_di
-            if delta == 1:
-                # print("delta == 1")
-                b1.next = b2
-                b1adler.next = b2
-                b2.next = b3
-                b3.next = b4
-                b4.next = iram[di+3 & IBS]
-            elif delta == 2:
-                b1.next = b3
-                b1adler.next = b3
-                b2.next = b4
-                b3.next = iram[di+2 & IBS]
-                nb.next = 3
-            elif delta == 3:
-                b1.next = b4
-                b1adler.next = b4
-                b2.next = iram[di+1 & IBS]
-                nb.next = 2
-            elif delta == 4:
-                b1.next = iram[di & IBS]
-                b1adler.next = iram[di & IBS]
-                nb.next = 1
-            else:
-                pass
-        elif not filled or nb == 0:
-            # print("nb.next = 1")
-            b1.next = iram[di & IBS]
-            b1adler.next = iram[di & IBS]
-            nb.next = 1
-        elif not filled or nb == 1:
-            b2.next = iram[di+1 & IBS]
-            nb.next = 2
-        elif not filled or nb == 2:
-            b3.next = iram[di+2 & IBS]
-            nb.next = 3
-        elif not filled or nb == 3:
-            b4.next = iram[di+3 & IBS]
-            nb.next = 4
-        else:
-            pass
-        old_di.next = di
     """
+    @always_seq(clk.posedge, reset)
+    def fill_buf():
+        if not reset:
+            nb.next = 0
+            old_di.next = 0
+            b1.next = 0
+            b2.next = 0
+            b3.next = 0
+            b4.next = 0
+        else:
+                if isize < 4:
+                    pass
+                elif i_mode == STARTC or i_mode == STARTD:
+                    nb.next = 0
+                elif not filled and nb == 4 and di - old_di <= 4:
+                    delta = di - old_di
+                    if delta == 1:
+                        # print("delta == 1")
+                        b1.next = b2
+                        b2.next = b3
+                        b3.next = b4
+                        b4.next = iram[di+3 & IBS]
+                    elif delta == 2:
+                        b1.next = b3
+                        b2.next = b4
+                        b3.next = iram[di+2 & IBS]
+                        nb.next = 3
+                    elif delta == 3:
+                        b1.next = b4
+                        b2.next = iram[di+1 & IBS]
+                        nb.next = 2
+                    elif delta == 4:
+                        b1.next = iram[di & IBS]
+                        nb.next = 1
+                    else:
+                        pass
+                elif not filled or nb == 0:
+                    # print("nb.next = 1")
+                    b1.next = iram[di & IBS]
+                    nb.next = 1
+                elif not filled or nb == 1:
+                    b2.next = iram[di+1 & IBS]
+                    nb.next = 2
+                elif not filled or nb == 2:
+                    b3.next = iram[di+2 & IBS]
+                    nb.next = 3
+                elif not filled or nb == 3:
+                    b4.next = iram[di+3 & IBS]
+                    nb.next = 4
+                else:
+                    pass
+                old_di.next = di
 
     def get4(boffset, width):
         if nb != 4:
@@ -378,6 +387,8 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte, i_addr, cl
                     filled.next = True
                     state.next = d_state.HEADER
 
+                else:
+                    pass
 
             elif state == d_state.HEADER:
 
@@ -387,15 +398,18 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte, i_addr, cl
                     pass
                 # Read block header
                 elif di == 0:
-                    print(iram[di & IBS])
-                    if iram[di & IBS] == 0x78:
+                    #print(iram[di & IBS])
+                    #if iram[di & IBS] == 0x78:
+                    if b1 == 0x78:
                         print("deflate mode")
                     else:
+                        print(di, dio, nb, b1, b2, b3, b4, isize)
                         raise Error("unexpected mode")
                     adv(8)
                 elif di == 1:
-                    print(iram[di & IBS])
-                    if iram[di & IBS] != 0x9c:
+                    #print(iram[di & IBS])
+                    #if iram[di & IBS] != 0x9c:
+                    if b1 != 0x9c:
                         raise Error("unexpected level")
                     adv(8)
                 else:
@@ -581,13 +595,14 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte, i_addr, cl
                             match = 3
 
                             if di < isize - 4 and \
-                                    iram[cur_search+3 & IBS] == iram[di + 3 & IBS]:
+                                    iram[cur_search+3 & IBS] == b4: # iram[di + 3 & IBS]:
                                 lencode = 258
                                 match = 4
                                 if di < isize - 5 and \
                                         iram[cur_search+4 & IBS] == iram[di + 4 & IBS]:
                                     lencode = 259
                                     match = 5
+                            """
                                     if di < isize - 6 and \
                                             iram[cur_search+5 & IBS] == iram[di + 5 & IBS]:
                                         lencode = 260
@@ -608,6 +623,7 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte, i_addr, cl
                                                             iram[cur_search+9 & IBS] == iram[di + 9 & IBS]:
                                                         lencode = 264
                                                         match = 10
+                            """
                             print("found:", cur_search, di, isize, match)
                             outlen = codeLength[lencode]
                             outbits = code_bits[lencode]

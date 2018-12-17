@@ -569,7 +569,7 @@ def test_deflate_bench(i_clk, o_led, led0_g, led1_b, led2_r):
         return dut, count, logic
 
 
-if 1: # not COSIMULATION:
+if 0: # not COSIMULATION:
     SLOWDOWN = 18 # 24
 
     tb = test_deflate_bench(Signal(bool(0)), Signal(intbv(0)[4:]),

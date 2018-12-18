@@ -360,8 +360,8 @@ def test_deflate_bench(i_clk, o_led, led0_g, led1_b, led2_r):
             # Failure: blink all color leds
 
             led0_g.next = not led0_g
-            led1_b.next = not led1_b
             led2_r.next = not led2_r
+            led1_b.next = o_done
 
         elif tstate == tb_state.WRITE:
             if tbi < len(CDATA):

@@ -67,7 +67,6 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte, i_addr, cl
     obyte = Signal(intbv()[8:])
     orbyte = Signal(intbv()[8:])
     ocopy = Signal(bool())
-    iraddr = Signal(intbv()[LBSIZE:])
 
     isize = Signal(intbv()[LBSIZE:])
     state = Signal(d_state.IDLE)
@@ -88,7 +87,7 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte, i_addr, cl
     # MaxToken = 285
     InvalidToken = 300
 
-    CODEBITS = MaxCodeLength
+    CODEBITS = 10 # MaxCodeLength
     BITBITS = 9
 
     codeLength = [Signal(intbv()[4:]) for _ in range(MaxBitLength+2)]
@@ -100,6 +99,7 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte, i_addr, cl
     distanceLength = [Signal(intbv()[4:]) for _ in range(32)]
 
     leaves = [Signal(intbv()[CODEBITS + BITBITS:]) for _ in range(512)]
+    laddr = Signal(intbv()[9])
     d_leaves = [Signal(intbv()[CODEBITS + BITBITS:]) for _ in range(128)]
     leaf = Signal(intbv()[CODEBITS + BITBITS:])
 
@@ -159,12 +159,11 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte, i_addr, cl
     ladler1 = Signal(intbv()[16:])
 
 
-    @always(clk.posedge)
+    @always_seq(clk.posedge, reset)
     def oramwrite():
         oram[oaddr].next = obyte
 
-    #@always_comb
-    @always(clk.posedge)
+    @always_seq(clk.posedge, reset)
     def oramread():
         orbyte.next = oram[oraddr]
 
@@ -334,22 +333,20 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte, i_addr, cl
 
     @always(clk.posedge)
     def io_logic():
+        if i_mode == WRITE:
 
-                if i_mode == WRITE:
+            # print("WRITE:", i_addr, i_data)
+            iram[i_addr & IBS].next = i_data
+            isize.next = i_addr
 
-                    # print("WRITE:", i_addr, i_data)
-                    iram[i_addr & IBS].next = i_data
-                    isize.next = i_addr
+        elif i_mode == READ:
 
-                elif i_mode == READ:
+            # o_data.next = oram[i_addr]
+            # oraddr.next = i_addr
+            o_byte.next = oram[i_addr]
 
-                    # o_data.next = oram[i_addr]
-                    # oraddr.next = i_addr
-                    o_byte.next = oram[i_addr]
-
-                else:
-                    pass
-
+        else:
+            pass
 
     @always_seq(clk.posedge, reset)
     def logic():
@@ -411,12 +408,14 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte, i_addr, cl
                     else:
                         print(di, dio, nb, b1, b2, b3, b4, isize)
                         raise Error("unexpected mode")
+                        state.next = d_state.IDLE
                     adv(8)
                 elif di == 1:
                     #print(iram[di & IBS])
                     #if iram[di & IBS] != 0x9c:
                     if b1 != 0x9c:
                         raise Error("unexpected level")
+                        state.next = d_state.IDLE
                     adv(8)
                 else:
                     if get4(0, 1):

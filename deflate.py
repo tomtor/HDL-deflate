@@ -146,6 +146,7 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte, i_addr, cl
     b41._markUsed()
 
     nb = Signal(intbv()[3:])
+    next_nb = Signal(intbv()[3:])
 
     newnb = Signal(intbv()[3:])
     filled = Signal(bool())
@@ -167,6 +168,7 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte, i_addr, cl
     def oramread():
         orbyte.next = oram[oraddr]
 
+    """
     @always_seq(clk.posedge, reset)
     def fill_buf():
         if not reset:
@@ -211,6 +213,7 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte, i_addr, cl
                     b2.next = b3
                     b3.next = b4
                     b4.next = iram[di+3 & IBS]
+                    # nb.next = 4
                 elif delta == 2:
                     b1.next = b3
                     b2.next = b4
@@ -241,6 +244,7 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte, i_addr, cl
             else:
                 pass
             old_di.next = di
+    """
     """
 
     def get4(boffset, width):
@@ -658,7 +662,6 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte, i_addr, cl
 
             elif state == d_state.STATIC:
 
-                """
                 for i in range(0, 144):
                     codeLength[i].next = 8
                 for i in range(144, 256):
@@ -685,6 +688,7 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte, i_addr, cl
                     numCodeLength.next = 288
                     cur_HF1.next = 0
                     state.next = d_state.HF1
+                """
 
             elif state == d_state.BL:
 

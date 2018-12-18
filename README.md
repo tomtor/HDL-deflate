@@ -32,9 +32,17 @@ better to use a more dense coding in your FPGA application data in the first pla
 
 # FPGA validation
 
-LUT	31716	63400	50.025238%
-LUTRAM	288	19000	1.5157895%
-FF	36525	126800	28.805204%
-BRAM	4	135	2.9629629%
-IO	8	210	3.809524%
-BUFG	1	32	3.125%
+Resource|Estimation|Available|Utilization %
+--------|----------|---------|-------------
+LUT	|31716	   |63400    |50.025238
+LUTRAM	|288	   |19000    |1.5157895
+FF	|36525	   |126800   |28.805204
+BRAM	|4	   |135	     |2.9629629
+IO	|8	   |210	     |3.809524
+BUFG	|1	   |32	     |3.125
+
+# Improvements
+
+* Reduce LUT usage!
+* Improve speed from current 80Mhz to 100Mhz
+* Improve compression performance

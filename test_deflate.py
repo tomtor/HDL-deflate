@@ -402,10 +402,11 @@ def test_deflate_bench(i_clk, o_led, led0_g, led1_b, led2_r):
                 if tbi > 0:
                     # print(o_data)
                     d_data[tbi-1].next = o_byte
-                    rud = UDATA[tbi-1]
-                    if o_byte != rud:
+                    if o_byte != ud:
                         i_mode.next = IDLE
-                        print("FAIL", len(UDATA), tbi, o_byte, rud)
+                        print("FAIL", len(UDATA), tbi, o_byte, ud)
+                        # resume.next = 1
+                        # tstate.next = tb_state.PAUSE
                         tstate.next = tb_state.FAIL
                         # tstate.next = tb_state.RESET
                         raise Error("bad result")
@@ -414,6 +415,7 @@ def test_deflate_bench(i_clk, o_led, led0_g, led1_b, led2_r):
                         # print(tbi, o_data)
                 i_addr.next = tbi + 1
                 tbi.next = tbi + 1
+                ud.next = UDATA[tbi]
             else:
                 print(len(UDATA))
                 print("DECOMPRESS test OK!, pausing", tbi)
@@ -529,15 +531,15 @@ def test_deflate_bench(i_clk, o_led, led0_g, led1_b, led2_r):
                 # print(tbi, o_data)
                 if tbi > 0:
                     d_data[tbi-1].next = o_byte
-                    cud = UDATA[tbi-1]
-                    if o_byte != cud:
+                    if o_byte != ud:
                         tstate.next = tb_state.RESET
                         i_mode.next = IDLE
-                        print("FAIL", len(UDATA), tbi, cud, o_byte)
+                        print("FAIL", len(UDATA), tbi, ud, o_byte)
                         raise Error("bad result")
                         tstate.next = tb_state.FAIL
                 tbi.next = tbi + 1
                 i_addr.next = tbi + 1
+                ud.next = UDATA[tbi]
             else:
                 print(len(UDATA))
                 print("ALL OK!", tbi)
@@ -568,7 +570,7 @@ def test_deflate_bench(i_clk, o_led, led0_g, led1_b, led2_r):
 
 
 if 1: # not COSIMULATION:
-    SLOWDOWN = 22 # 24
+    SLOWDOWN = 24
 
     tb = test_deflate_bench(Signal(bool(0)), Signal(intbv(0)[4:]),
                         Signal(bool(0)), Signal(bool(0)), Signal(bool(0)))

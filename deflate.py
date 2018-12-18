@@ -122,6 +122,7 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte, i_addr, cl
     cur_i = Signal(intbv()[LBSIZE:])
     spread_i = Signal(intbv()[9:])
     cur_HF1 = Signal(intbv()[10:])
+    cur_static = Signal(intbv()[9:])
     cur_cstatic = Signal(intbv()[LBSIZE:])
     cur_search = Signal(intbv(min=-CWINDOW,max=IBSIZE))
     cur_dist = Signal(intbv(min=-CWINDOW,max=IBSIZE))
@@ -373,6 +374,7 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte, i_addr, cl
                     do.next = 0
                     doo.next = 0
                     filled.next = True
+                    cur_static.next = 0
                     state.next = d_state.STATIC
 
                 elif i_mode == STARTD:
@@ -428,6 +430,7 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte, i_addr, cl
                         adv(3)
                     elif i == 1:
                         static.next = True
+                        cur_static.next = 0
                         state.next = d_state.STATIC
                         adv(3)
                     elif i == 0:
@@ -655,6 +658,7 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte, i_addr, cl
 
             elif state == d_state.STATIC:
 
+                """
                 for i in range(0, 144):
                     codeLength[i].next = 8
                 for i in range(144, 256):
@@ -666,6 +670,21 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte, i_addr, cl
                 numCodeLength.next = 288
                 cur_HF1.next = 0
                 state.next = d_state.HF1
+                """
+                if cur_static < 288:
+                    if cur_static < 144:
+                        codeLength[cur_static].next = 8
+                    elif cur_static < 256:
+                        codeLength[cur_static].next = 9
+                    elif cur_static < 280:
+                        codeLength[cur_static].next = 7
+                    else:
+                        codeLength[cur_static].next = 8
+                    cur_static.next = cur_static + 1
+                else:
+                    numCodeLength.next = 288
+                    cur_HF1.next = 0
+                    state.next = d_state.HF1
 
             elif state == d_state.BL:
 
@@ -1150,7 +1169,7 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte, i_addr, cl
 
             else:
 
-                print("unknow state?!")
+                print("unknown state?!")
                 state.next = d_state.IDLE
 
     return io_logic, logic, fill_buf, oramwrite, oramread

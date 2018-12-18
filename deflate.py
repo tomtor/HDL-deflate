@@ -99,8 +99,11 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte, i_addr, cl
     distanceLength = [Signal(intbv()[4:]) for _ in range(32)]
 
     leaves = [Signal(intbv()[CODEBITS + BITBITS:]) for _ in range(512)]
-    laddr = Signal(intbv()[9])
+    lwaddr = Signal(intbv()[9:])
+    # lraddr = Signal(intbv()[9:])
     d_leaves = [Signal(intbv()[CODEBITS + BITBITS:]) for _ in range(128)]
+    # rleaf = Signal(intbv()[CODEBITS + BITBITS:])
+    wleaf = Signal(intbv()[CODEBITS + BITBITS:])
     leaf = Signal(intbv()[CODEBITS + BITBITS:])
 
     minBits = Signal(intbv()[5:])
@@ -126,7 +129,8 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte, i_addr, cl
     cur_cstatic = Signal(intbv()[LBSIZE:])
     cur_search = Signal(intbv(min=-CWINDOW,max=IBSIZE))
     cur_dist = Signal(intbv(min=-CWINDOW,max=IBSIZE))
-    cur_next = Signal(intbv()[5:])
+    # cur_next = Signal(intbv()[5:])
+    cur_next = Signal(bool())
 
     length = Signal(intbv()[LBSIZE:])
     offset = Signal(intbv()[LBSIZE:])
@@ -146,9 +150,7 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte, i_addr, cl
     b41._markUsed()
 
     nb = Signal(intbv()[3:])
-    next_nb = Signal(intbv()[3:])
 
-    newnb = Signal(intbv()[3:])
     filled = Signal(bool())
 
     ob1 = Signal(intbv()[8:])
@@ -159,13 +161,15 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte, i_addr, cl
     ladler1 = Signal(intbv()[16:])
 
 
-    @always_seq(clk.posedge, reset)
+    @always(clk.posedge)
     def oramwrite():
         oram[oaddr].next = obyte
+        leaves[lwaddr].next = wleaf
 
-    @always_seq(clk.posedge, reset)
+    @always(clk.posedge)
     def oramread():
         orbyte.next = oram[oraddr]
+        # rleaf.next = leaves[lraddr]
 
     """
     @always_seq(clk.posedge, reset)
@@ -424,7 +428,7 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte, i_addr, cl
                     i = get4(1, 2)
                     method.next = i
                     print("method", i)
-                    print(di, dio, nb, b1, b2, b3, b4, i, isize)
+                    # print(di, dio, nb, b1, b2, b3, b4, i, isize)
                     if i == 2:
                         state.next = d_state.BL
                         numCodeLength.next = 0
@@ -809,7 +813,9 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte, i_addr, cl
                 if cur_HF1 < len(d_leaves):
                     d_leaves[cur_HF1].next = 0
                 if method != 4 and cur_HF1 < len(leaves):
-                    leaves[cur_HF1].next = 0
+                    lwaddr.next = cur_HF1
+                    wleaf.next = 0
+                    # leaves[cur_HF1].next = 0
                 limit = len(leaves)
                 if method == 4:
                     limit = len(d_leaves)
@@ -924,7 +930,9 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte, i_addr, cl
                                 spread_i.next = spread_i + 1
                             HF4_init.next = 0
                         else:
-                            leaves[reverse].next = leaf # makeLeaf(spread_i, bits)
+                            wleaf.next = leaf
+                            lwaddr.next = reverse
+                            # leaves[reverse].next = leaf # makeLeaf(spread_i, bits)
                             code_bits[spread_i].next = reverse
                             if bits <= instantMaxBit:
                                 if reverse + (1 << bits) <= instantMask:
@@ -962,8 +970,9 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte, i_addr, cl
                     d_leaves[spread].next = makeLeaf(
                         spread_i, codeLength[spread_i])
                 else:
-                    leaves[spread].next = makeLeaf(
-                        spread_i, codeLength[spread_i])
+                    lwaddr.next = spread
+                    wleaf.next = makeLeaf(spread_i, codeLength[spread_i])
+                    # leaves[spread].next = makeLeaf(spread_i, codeLength[spread_i])
                 # print("SPREAD:", spread, step, instantMask)
                 aim = instantMask
                 if method == 4:
@@ -984,16 +993,17 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte, i_addr, cl
                     # print("INIT:", di, dio, instantMaxBit, maxBits)
                     if instantMaxBit <= maxBits:
                         cto = get4(0, maxBits)
-                        cur_next.next = instantMaxBit
+                        cur_next.next = 1  # instantMaxBit
                         mask = (1 << instantMaxBit) - 1
+                        # lraddr.next = (cto & mask)
                         leaf.next = leaves[cto & mask]
                         # print(cur_next, mask, leaf, maxBits)
                     else:
                         print("FAIL instantMaxBit <= maxBits")
                         raise Error("FAIL instantMaxBit <= maxBits")
-                elif cur_next <= maxBits:
+                else:  # if cur_next <= maxBits:
                     # print("NEXT:", cur_next)
-                    if get_bits(leaf) <= cur_next:
+                    # if get_bits(leaf) <= cur_next:
                         if get_bits(leaf) < 1:
                             print("< 1 bits: ")
                             raise Error("< 1 bits: ")
@@ -1006,12 +1016,14 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte, i_addr, cl
                             state.next = d_state.READBL
                         else:
                             state.next = d_state.INFLATE
+                """
                     else:
                         print("FAIL get_bits(leaf) <= cur_next")
                         raise Error("?")
                 else:
                     print("no next token")
                     raise Error("no next token")
+                """
 
             elif state == d_state.D_NEXT:
 
@@ -1021,21 +1033,21 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte, i_addr, cl
                     pass
                 elif cur_next == 0:
                     # print("D_INIT:", di, dio, d_instantMaxBit, d_maxBits)
-                    if d_instantMaxBit <= d_maxBits:
+                    # if d_instantMaxBit <= d_maxBits:
                         token = code - 257
                         # print("token: ", token)
                         extraLength = ExtraLengthBits[token]
                         # print("extra length bits:", extraLength)
                         cto = get4(extraLength, d_maxBits)
-                        cur_next.next = d_instantMaxBit
+                        cur_next.next = 1  # d_instantMaxBit
                         mask = (1 << d_instantMaxBit) - 1
                         leaf.next = d_leaves[cto & mask]
                         # print(cur_next, mask, leaf, d_maxBits)
-                    else:
-                        raise Error("???")
+                    # else:
+                        # raise Error("???")
 
-                elif cur_next <= d_maxBits:
-                    if get_bits(leaf) <= cur_next:
+                else:  # if cur_next <= d_maxBits:
+                    # if get_bits(leaf) <= cur_next:
                         if get_bits(leaf) == 0:
                             raise Error("0 bits")
                         token = code - 257
@@ -1065,11 +1077,12 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte, i_addr, cl
                         # cur_next.next = 0
                         cur_i.next = 0
                         state.next = d_state.COPY
-
+                """
                     else:
                         raise Error("?")
                 else:
                     raise Error("no next token")
+                """
 
             elif state == d_state.INFLATE:
 

@@ -372,7 +372,7 @@ def test_deflate_bench(i_clk, o_led, led0_g, led1_b, led2_r):
         elif tstate == tb_state.WRITE:
             if tbi < len(CDATA):
                 # print(tbi)
-                # o_led.next = tbi
+                o_led.next = tbi
                 led1_b.next = o_done
                 led2_r.next = not led2_r
                 i_mode.next = WRITE
@@ -411,7 +411,7 @@ def test_deflate_bench(i_clk, o_led, led0_g, led1_b, led2_r):
         elif tstate == tb_state.VERIFY:
             # print("VERIFY", o_data)
             led1_b.next = 0
-            # o_led.next = tbi
+            o_led.next = tbi
             """
             Note that the read can also be pipelined in a tight loop
             without the WTICK delay, but this will not work with
@@ -466,7 +466,7 @@ def test_deflate_bench(i_clk, o_led, led0_g, led1_b, led2_r):
         #####################################
 
         elif tstate == tb_state.CWRITE:
-            # o_led.next = tbi
+            o_led.next = tbi
             if tbi < len(UDATA):
                 # print(tbi)
                 led2_r.next = 0
@@ -503,7 +503,7 @@ def test_deflate_bench(i_clk, o_led, led0_g, led1_b, led2_r):
         elif tstate == tb_state.CRESULT:
             # print("GET COMPRESS RESULT", tbi, o_data)
             led2_r.next = 0
-            # o_led.next = tbi
+            o_led.next = tbi
             if wtick:
                 wtick.next = False
             elif tbi < resultlen:
@@ -521,7 +521,7 @@ def test_deflate_bench(i_clk, o_led, led0_g, led1_b, led2_r):
 
         elif tstate == tb_state.VWRITE:
             led1_b.next = 0
-            # o_led.next = tbi
+            o_led.next = tbi
             if tbi < resultlen:
                 # print(tbi, d_data[tbi])
                 led2_r.next = not led2_r
@@ -555,7 +555,7 @@ def test_deflate_bench(i_clk, o_led, led0_g, led1_b, led2_r):
             # print("COMPRESS VERIFY", tbi, o_byte)
             led1_b.next = 0
             led2_r.next = not led2_r
-            # o_led.next = tbi
+            o_led.next = tbi
             if wtick:
                 wtick.next = False
             elif tbi < len(UDATA):

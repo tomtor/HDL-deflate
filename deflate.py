@@ -171,12 +171,11 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte, i_addr,
         orbyte.next = oram[oraddr]
         # rleaf.next = leaves[lraddr]
 
-    """
     @always(clk.posedge)
     def fill_buf():
         if not reset:
+            print("FILL RESET")
             nb.next = 0
-            old_di.next = 0
             b1.next = 0
             b2.next = 0
             b3.next = 0
@@ -248,7 +247,6 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte, i_addr,
             else:
                 pass
             old_di.next = di
-    """
     """
 
     def get4(boffset, width):
@@ -385,7 +383,9 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte, i_addr,
 
                     do_compress.next = False
                     o_done.next = False
-                    #di.next = 2
+                    o_iprogress.next = 0
+                    o_oprogress.next = 0
+                    # di.next = 2
                     di.next = 0
                     dio.next = 0
                     do.next = 0
@@ -424,29 +424,28 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte, i_addr,
                     if get4(0, 1):
                         print("final")
                         final.next = True
-                    i = get4(1, 2)
-                    method.next = i
-                    print("method", i)
-                    # print(di, dio, nb, b1, b2, b3, b4, i, isize)
-                    if i == 2:
+                    hm = get4(1, 2)
+                    method.next = hm
+                    print("method", hm)
+                    # print(di, dio, nb, b1, b2, b3, b4, hm, isize)
+                    if hm == 2:
                         state.next = d_state.BL
                         numCodeLength.next = 0
                         numLiterals.next = 0
                         static.next = False
                         adv(3)
-                    elif i == 1:
+                    elif hm == 1:
                         static.next = True
                         cur_static.next = 0
                         state.next = d_state.STATIC
                         adv(3)
-                    elif i == 0:
+                    elif hm == 0:
                         state.next = d_state.COPY
                         skip = 8 - dio
                         if skip <= 2:
                             skip = 16 - dio
-                        i = get4(skip, 16)
+                        length.next = get4(skip, 16)
                         adv(skip + 16)
-                        length.next = i
                         cur_i.next = 0
                         offset.next = 7
                     else:
@@ -490,10 +489,10 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte, i_addr,
                 elif cur_cstatic - 3 > isize:
                     if cur_cstatic - 3 == isize + 1:
                         print("Put EOF", do)
-                        i = EndOfBlock
-                        outlen = codeLength[i]
-                        outbits = code_bits[i]
-                        print("EOF BITS:", i, outlen, outbits)
+                        cs_i = EndOfBlock
+                        outlen = codeLength[cs_i]
+                        outbits = code_bits[cs_i]
+                        print("EOF BITS:", cs_i, outlen, outbits)
                         oaddr.next = do
                         obyte.next = put(outbits, outlen)
                         put_adv(outbits, outlen)
@@ -665,14 +664,14 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte, i_addr,
 
             elif state == d_state.STATIC:
 
-                for i in range(0, 144):
-                    codeLength[i].next = 8
-                for i in range(144, 256):
-                    codeLength[i].next = 9
-                for i in range(256, 280):
-                    codeLength[i].next = 7
-                for i in range(280, 288):
-                    codeLength[i].next = 8
+                for stat_i in range(0, 144):
+                    codeLength[stat_i].next = 8
+                for stat_i in range(144, 256):
+                    codeLength[stat_i].next = 9
+                for stat_i in range(256, 280):
+                    codeLength[stat_i].next = 7
+                for stat_i in range(280, 288):
+                    codeLength[stat_i].next = 8
                 numCodeLength.next = 288
                 cur_HF1.next = 0
                 state.next = d_state.HF1
@@ -710,14 +709,14 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte, i_addr,
                     adv(14)
                 else:
                     if numCodeLength < CodeLengths:
-                        i = CodeLengthOrder[numCodeLength]
-                        # print("CLI: ", i)
+                        clo_i = CodeLengthOrder[numCodeLength]
+                        # print("CLI: ", clo_i)
                         if numCodeLength < b_numCodeLength:
-                            codeLength[i].next = get4(0, 3)
+                            codeLength[clo_i].next = get4(0, 3)
                             adv(3)
                         else:
                             # print("SKIP")
-                            codeLength[i].next = 0
+                            codeLength[clo_i].next = 0
                         numCodeLength.next = numCodeLength + 1
                     else:
                         numCodeLength.next = CodeLengths
@@ -732,38 +731,38 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte, i_addr,
                     pass
                 elif numCodeLength < numLiterals + numDistance:
                     # print(numLiterals + numDistance, numCodeLength)
-                    i = 0
+                    n_adv = 0
                     if code < 16:
                         howOften.next = 1
                         lastToken.next = code
                     elif code == 16:
                         howOften.next = 3 + get4(0, 2)
-                        i = 2
+                        n_adv = 2
                     elif code == 17:
                         howOften.next = 3 + get4(0, 3)
                         lastToken.next = 0
-                        i = 3
+                        n_adv = 3
                     elif code == 18:
                         howOften.next = 11 + get4(0, 7)
                         lastToken.next = 0
-                        i = 7
+                        n_adv = 7
                     else:
                         raise Error("Invalid data")
 
-                    # print(numCodeLength, howOften, code, di, i)
-                    if i != 0:
-                        adv(i)
+                    # print(numCodeLength, howOften, code, di, n_adv)
+                    if n_adv != 0:
+                        adv(n_adv)
 
                     state.next = d_state.REPEAT
                 else:
                     print("FILL UP")
 
-                    for i in range(32):
+                    for dbl_i in range(32):
                         dbl = 0
-                        if i + numLiterals < numCodeLength:
-                            dbl = int(codeLength[i + numLiterals])
+                        if dbl_i + numLiterals < numCodeLength:
+                            dbl = int(codeLength[dbl_i + numLiterals])
                         # print("dbl:", dbl)
-                        distanceLength[i].next = dbl
+                        distanceLength[dbl_i].next = dbl
 
                     # print(numCodeLength, numLiterals, MaxBitLength)
 
@@ -784,9 +783,9 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte, i_addr,
             elif state == d_state.DISTTREE:
 
                 print("DISTTREE")
-                for i in range(32):
-                    codeLength[i].next = distanceLength[i]
-                    # print(i, distanceLength[i])
+                for dist_i in range(32):
+                    codeLength[dist_i].next = distanceLength[dist_i]
+                    # print(dist_i, distanceLength[dist_i])
                 numCodeLength.next = 32
                 method.next = 4  # Start building dist tree
                 # cur_i.next = 0
@@ -877,8 +876,8 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte, i_addr,
                     state.next = d_state.HF3
                     cur_i.next = minBits
                     code.next = 0
-                    for i in range(len(nextCode)):
-                        nextCode[i].next = 0
+                    for hf2_i in range(len(nextCode)):
+                        nextCode[hf2_i].next = 0
                     print("to HF3")
 
             elif state == d_state.HF3:

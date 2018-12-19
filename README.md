@@ -39,7 +39,7 @@ LUTRAM	|776
 FF	|2862
 BRAM	|4
 
-# Improvements
+# Future Improvements (when there is interest)
 
 * Reduce LUT usage
 * Improve speed from current 80Mhz to 100Mhz

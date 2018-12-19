@@ -281,11 +281,12 @@ SLOWDOWN = 1
 @block
 def test_deflate_bench(i_clk, o_led, led0_g, led1_b, led2_r):
 
-    d_data = [Signal(intbv()[8:]) for _ in range(2048)]
     u_data, c_data = test_data(1)
 
     CDATA = tuple(c_data)
     UDATA = tuple(u_data)
+
+    d_data = [Signal(intbv()[8:]) for _ in range(len(u_data))]
 
     i_mode = Signal(intbv(0)[3:])
     o_done = Signal(bool(0))
@@ -348,7 +349,6 @@ def test_deflate_bench(i_clk, o_led, led0_g, led1_b, led2_r):
 
         elif tstate == tb_state.START:
             # A few cycles reset low
-
             if tbi < 2:
                 tbi.next = tbi.next + 1
             else:
@@ -358,7 +358,6 @@ def test_deflate_bench(i_clk, o_led, led0_g, led1_b, led2_r):
 
         elif tstate == tb_state.FAIL:
             # Failure: blink all color leds
-
             led0_g.next = not led0_g
             led2_r.next = not led2_r
             led1_b.next = o_done
@@ -588,6 +587,6 @@ if 1:
               "test_fast_bench.v dump.v; " +
               "vvp test_deflate")
               """
-if 1:
+if 0:
     print("Start Unit test")
     unittest.main(verbosity=2)

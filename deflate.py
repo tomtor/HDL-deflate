@@ -51,7 +51,8 @@ ExtraDistanceBits = (0, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13)
 
 
 @block
-def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte, i_addr, clk, reset):
+def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte, i_addr,
+            clk, reset):
 
     """ Deflate (de)compress
 
@@ -66,7 +67,6 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte, i_addr, cl
     oraddr = Signal(intbv()[LBSIZE:])
     obyte = Signal(intbv()[8:])
     orbyte = Signal(intbv()[8:])
-    ocopy = Signal(bool())
 
     isize = Signal(intbv()[LBSIZE:])
     state = Signal(d_state.IDLE)
@@ -172,7 +172,7 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte, i_addr, cl
         # rleaf.next = leaves[lraddr]
 
     """
-    @always_seq(clk.posedge, reset)
+    @always(clk.posedge)
     def fill_buf():
         if not reset:
             nb.next = 0
@@ -194,9 +194,10 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte, i_addr, cl
                 b3.next = iram[di+2 & IBS]
                 b4.next = iram[di+3 & IBS]
     """
-    @always_seq(clk.posedge, reset)
+    @always(clk.posedge)
     def fill_buf():
         if not reset:
+            print("FILL RESET")
             nb.next = 0
             old_di.next = 0
             b1.next = 0
@@ -352,7 +353,7 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte, i_addr, cl
         else:
             pass
 
-    @always_seq(clk.posedge, reset)
+    @always(clk.posedge)
     def logic():
         if not reset:
             print("DEFLATE RESET")
@@ -363,8 +364,6 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte, i_addr, cl
         else:
 
             if state == d_state.IDLE:
-
-                ocopy.next = False
 
                 if i_mode == STARTC:
 
@@ -451,6 +450,7 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte, i_addr, cl
                         cur_i.next = 0
                         offset.next = 7
                     else:
+                        state.next = d_state.IDLE
                         print("Bad method")
                         raise Error("Bad method")
 

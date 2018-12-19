@@ -34,13 +34,13 @@ better to use a more dense coding in your FPGA application data in the first pla
 
 Resource|Estimation
 --------|----------
-LUT	|30296
-LUTRAM	|472
-FF	|23542
+LUT	|7559
+LUTRAM	|776
+FF	|2862
 BRAM	|4
 
 # Improvements
 
-* Reduce LUT usage!
+* Reduce LUT usage
 * Improve speed from current 80Mhz to 100Mhz
 * Improve compression performance

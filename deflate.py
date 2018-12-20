@@ -257,7 +257,6 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte, i_addr,
         return (b41 >> (dio + boffset)) & ((1 << width) - 1)
         # return b41[dio + boffset + width: dio + boffset]
 
-
     def adv(width):
         # print("adv", width, di, dio, do, doo)
         nshift = ((dio + width) >> 3)
@@ -386,9 +385,9 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte, i_addr,
                     o_done.next = False
                     o_iprogress.next = 0
                     o_oprogress.next = 0
-                    # di.next = 2
                     di.next = 0
                     dio.next = 0
+                    # oaddr.next = 0
                     do.next = 0
                     doo.next = 0
                     filled.next = True
@@ -590,7 +589,7 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte, i_addr,
                 else:
                     if cur_search >= 0 \
                              and cur_search >= di - CWINDOW \
-                             and di >= 3 and di < isize - 3:
+                             and di < isize - 3:
                         if iram[cur_search & IBS] == b1 and \
                                 iram[cur_search+1 & IBS] == b2 and \
                                 iram[cur_search+2 & IBS] == b3:
@@ -1070,6 +1069,7 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte, i_addr,
                         length.next = tlength
                         # cur_next.next = 0
                         cur_i.next = 0
+                        oraddr.next = offset
                         state.next = d_state.COPY
                 """
                     else:
@@ -1134,6 +1134,7 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte, i_addr,
                                 offset.next = do - distance
                                 length.next = tlength
                                 cur_i.next = 0
+                                oraddr.next = offset
                                 state.next = d_state.COPY
                             else:
                                 # raise Error("TO DO")
@@ -1162,7 +1163,6 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte, i_addr,
                         state.next = d_state.IDLE
                 elif cur_i < length + 1:
                     oraddr.next = offset + cur_i
-                    cur_i.next = cur_i + 1
                     if cur_i == 1:
                         copy1.next = orbyte
                     if cur_i > 1:
@@ -1173,10 +1173,11 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte, i_addr,
                         oaddr.next = do
                         o_oprogress.next = do + 1
                         do.next = do + 1
+                    cur_i.next = cur_i + 1
                 else:
                     oaddr.next = do
                     if offset + cur_i == do + 1:
-                        copy1.next = orbyte
+                        obyte.next = copy1
                     else:
                         obyte.next = orbyte
                     do.next = do + 1

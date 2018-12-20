@@ -40,6 +40,7 @@ def test_data(m):
         b_data = str_data.encode('utf-8')
     elif m == 1:
         str_data = " ".join(["   Hello World! " + str(i) + "     "
+        # str_data = " ".join(["Hello World! " + str(i) + " "
                              for i in range(5)])
         b_data = str_data.encode('utf-8')
     elif m == 2:
@@ -579,6 +580,8 @@ def test_deflate_bench(i_clk, o_led, led0_g, led1_b, led2_r):
                 resume.next = 1
                 if SLOWDOWN <= 4:
                     raise StopSimulation()
+                """
+                """
                 tstate.next = tb_state.CPAUSE
                 # tstate.next = tb_state.HALT
 
@@ -602,7 +605,7 @@ def test_deflate_bench(i_clk, o_led, led0_g, led1_b, led2_r):
         return dut, count, logic
 
 
-if 1: # not COSIMULATION:
+if 0: # not COSIMULATION:
     SLOWDOWN = 22
 
     tb = test_deflate_bench(Signal(bool(0)), Signal(intbv(0)[4:]),

@@ -411,15 +411,9 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte, i_addr,
                     else:
                         print(di, dio, nb, b1, b2, b3, b4, isize)
                         raise Error("unexpected mode")
+                        o_done.next = True
                         state.next = d_state.IDLE
-                    adv(8)
-                elif di == 1:
-                    #print(iram[di & IBS])
-                    #if iram[di & IBS] != 0x9c:
-                    if b1 != 0x9c:
-                        raise Error("unexpected level")
-                        state.next = d_state.IDLE
-                    adv(8)
+                    adv(16)
                 else:
                     if get4(0, 1):
                         print("final")

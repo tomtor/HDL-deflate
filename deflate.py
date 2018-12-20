@@ -1063,7 +1063,7 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte, i_addr,
                 length.next = tlength
                 # cur_next.next = 0
                 cur_i.next = 0
-                oraddr.next = offset
+                oraddr.next = do - distance
                 state.next = d_state.COPY
 
             elif state == d_state.INFLATE:
@@ -1122,7 +1122,7 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte, i_addr,
                                 offset.next = do - distance
                                 length.next = tlength
                                 cur_i.next = 0
-                                oraddr.next = offset
+                                oraddr.next = do - distance
                                 state.next = d_state.COPY
                             else:
                                 # raise Error("TO DO")

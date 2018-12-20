@@ -49,6 +49,10 @@ def test_data(m):
         b_data = str_data.encode('utf-8')
     elif m == 3:
         b_data = bytes([random.randrange(0,0x100) for i in range(100)])
+    elif m == 4:
+        str_data = " ".join(["Hi: 1111  Hi: 2106  Hi: 1967  Hi: 4092  Hi: 13 "
+                             for i in range(10)])
+        b_data = str_data.encode('utf-8')
     else:
         raise Error("unknown test mode")
     b_data = b_data[:IBSIZE-4]
@@ -250,7 +254,7 @@ class TestDeflate(unittest.TestCase):
             print(len(b_data), len(zl_data), len(c_data))
 
         for loop in range(1):
-            for mode in range(4):
+            for mode in range(5):
                 self.runTests(test_decompress)
 
     def runTests(self, test):

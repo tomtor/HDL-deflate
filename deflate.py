@@ -31,7 +31,7 @@ IBS = (1 << int(log2(IBSIZE))) - 1
 
 d_state = enum('IDLE', 'HEADER', 'BL', 'READBL', 'REPEAT', 'DISTTREE', 'INIT3',
                'HF1', 'HF1INIT', 'HF2', 'HF3', 'HF4', 'HF4_2', 'HF4_3',
-               'STATIC', 'D_NEXT',
+               'STATIC', 'D_NEXT', 'D_NEXT_2',
                'D_INFLATE', 'SPREAD', 'NEXT', 'INFLATE', 'COPY', 'CSTATIC',
                'SEARCH', 'DISTANCE', 'CHECKSUM') # , encoding='one_hot')
 
@@ -96,7 +96,6 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte, i_addr,
     bitLengthCount = [Signal(intbv()[9:]) for _ in range(MaxCodeLength+1)]
     nextCode = [Signal(intbv()[CODEBITS:]) for _ in range(MaxCodeLength)]
     reverse = Signal(intbv()[CODEBITS:])
-    HF4_init = Signal(bool())
     code_bits = [Signal(intbv()[9:]) for _ in range(MaxBitLength)]
     distanceLength = [Signal(intbv()[4:]) for _ in range(32)]
 
@@ -896,7 +895,6 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte, i_addr,
                     state.next = d_state.HF4
                     cur_i.next = 0
                     spread_i.next = 0
-                    HF4_init.next = 0
                     print("to HF4")
 
             elif state == d_state.HF4_2:
@@ -926,7 +924,6 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte, i_addr,
                     else:
                         state.next = d_state.HF4
                         spread_i.next = spread_i + 1
-                    HF4_init.next = 0
                 else:
                     wleaf.next = leaf
                     lwaddr.next = reverse
@@ -943,7 +940,6 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte, i_addr,
                     else:
                         spread_i.next = spread_i + 1
                         state.next = d_state.HF4
-                    HF4_init.next = 0
 
             elif state == d_state.HF4:
                 # create binary codes for each literal
@@ -1000,39 +996,25 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte, i_addr,
                     pass
                 elif cur_next == 0:
                     # print("INIT:", di, dio, instantMaxBit, maxBits)
-                    if instantMaxBit <= maxBits:
-                        cto = get4(0, maxBits)
-                        cur_next.next = 1  # instantMaxBit
-                        mask = (1 << instantMaxBit) - 1
-                        # lraddr.next = (cto & mask)
-                        leaf.next = leaves[cto & mask]
-                        # print(cur_next, mask, leaf, maxBits)
-                    else:
-                        print("FAIL instantMaxBit <= maxBits")
-                        raise Error("FAIL instantMaxBit <= maxBits")
-                else:  # if cur_next <= maxBits:
-                    # print("NEXT:", cur_next)
-                    # if get_bits(leaf) <= cur_next:
-                        if get_bits(leaf) < 1:
-                            print("< 1 bits: ")
-                            raise Error("< 1 bits: ")
-                        adv(get_bits(leaf))
-                        if get_code(leaf) == 0:
-                            print("leaf 0")
-                        code.next = get_code(leaf)
-                        # print("ADV:", di, get_bits(leaf), get_code(leaf))
-                        if method == 2:
-                            state.next = d_state.READBL
-                        else:
-                            state.next = d_state.INFLATE
-                """
-                    else:
-                        print("FAIL get_bits(leaf) <= cur_next")
-                        raise Error("?")
+                    cto = get4(0, maxBits)
+                    cur_next.next = 1  # instantMaxBit
+                    mask = (1 << instantMaxBit) - 1
+                    # lraddr.next = (cto & mask)
+                    leaf.next = leaves[cto & mask]
+                    # print(cur_next, mask, leaf, maxBits)
                 else:
-                    print("no next token")
-                    raise Error("no next token")
-                """
+                    if get_bits(leaf) < 1:
+                        print("< 1 bits: ")
+                        raise Error("< 1 bits: ")
+                    adv(get_bits(leaf))
+                    if get_code(leaf) == 0:
+                        print("leaf 0")
+                    code.next = get_code(leaf)
+                    # print("ADV:", di, get_bits(leaf), get_code(leaf))
+                    if method == 2:
+                        state.next = d_state.READBL
+                    else:
+                        state.next = d_state.INFLATE
 
             elif state == d_state.D_NEXT:
 
@@ -1040,59 +1022,49 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte, i_addr,
                     filled.next = True
                 elif nb < 4:
                     pass
-                elif cur_next == 0:
-                    # print("D_INIT:", di, dio, d_instantMaxBit, d_maxBits)
-                    # if d_instantMaxBit <= d_maxBits:
-                        token = code - 257
-                        # print("token: ", token)
-                        extraLength = ExtraLengthBits[token]
-                        # print("extra length bits:", extraLength)
-                        cto = get4(extraLength, d_maxBits)
-                        cur_next.next = 1  # d_instantMaxBit
-                        mask = (1 << d_instantMaxBit) - 1
-                        leaf.next = d_leaves[cto & mask]
-                        # print(cur_next, mask, leaf, d_maxBits)
-                    # else:
-                        # raise Error("???")
-
-                else:  # if cur_next <= d_maxBits:
-                    # if get_bits(leaf) <= cur_next:
-                        if get_bits(leaf) == 0:
-                            raise Error("0 bits")
-                        token = code - 257
-                        # print("E2:", token, leaf)
-                        tlength = CopyLength[token]
-                        # print("tlength:", tlength)
-                        extraLength = ExtraLengthBits[token]
-                        # print("extra length bits:", extraLength)
-                        tlength += get4(0, extraLength)
-                        # print("extra length:", tlength)
-                        distanceCode = get_code(leaf)
-                        # print("distance code:", distanceCode)
-                        distance = CopyDistance[distanceCode]
-                        # print("distance:", distance)
-                        moreBits = ExtraDistanceBits[distanceCode >> 1]
-                        # print("more bits:", moreBits)
-                        # print("bits:", get_bits(leaf))
-                        mored = get4(extraLength + get_bits(leaf), moreBits)
-                        # print("mored:", mored)
-                        distance += mored
-                        # print("distance more:", distance)
-                        adv(moreBits + extraLength + get_bits(leaf))
-                        # print("offset:", do - distance)
-                        # print("FAIL?: ", di, dio, do, b1, b2, b3, b4)
-                        offset.next = do - distance
-                        length.next = tlength
-                        # cur_next.next = 0
-                        cur_i.next = 0
-                        oraddr.next = offset
-                        state.next = d_state.COPY
-                """
-                    else:
-                        raise Error("?")
                 else:
-                    raise Error("no next token")
-                """
+                    # print("D_INIT:", di, dio, d_instantMaxBit, d_maxBits)
+                    token = code - 257
+                    # print("token: ", token)
+                    extraLength = ExtraLengthBits[token]
+                    # print("extra length bits:", extraLength)
+                    cto = get4(extraLength, d_maxBits)
+                    mask = (1 << d_instantMaxBit) - 1
+                    leaf.next = d_leaves[cto & mask]
+                    state.next = d_state.D_NEXT_2
+
+            elif state == d_state.D_NEXT_2:
+
+                if get_bits(leaf) == 0:
+                    raise Error("0 bits")
+                token = code - 257
+                # print("E2:", token, leaf)
+                tlength = CopyLength[token]
+                # print("tlength:", tlength)
+                extraLength = ExtraLengthBits[token]
+                # print("extra length bits:", extraLength)
+                tlength += get4(0, extraLength)
+                # print("extra length:", tlength)
+                distanceCode = get_code(leaf)
+                # print("distance code:", distanceCode)
+                distance = CopyDistance[distanceCode]
+                # print("distance:", distance)
+                moreBits = ExtraDistanceBits[distanceCode >> 1]
+                # print("more bits:", moreBits)
+                # print("bits:", get_bits(leaf))
+                mored = get4(extraLength + get_bits(leaf), moreBits)
+                # print("mored:", mored)
+                distance += mored
+                # print("distance more:", distance)
+                adv(moreBits + extraLength + get_bits(leaf))
+                # print("offset:", do - distance)
+                # print("FAIL?: ", di, dio, do, b1, b2, b3, b4)
+                offset.next = do - distance
+                length.next = tlength
+                # cur_next.next = 0
+                cur_i.next = 0
+                oraddr.next = offset
+                state.next = d_state.COPY
 
             elif state == d_state.INFLATE:
 

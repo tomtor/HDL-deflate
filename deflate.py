@@ -30,7 +30,8 @@ else:
 IBS = (1 << int(log2(IBSIZE))) - 1
 
 d_state = enum('IDLE', 'HEADER', 'BL', 'READBL', 'REPEAT', 'DISTTREE', 'INIT3',
-               'HF1', 'HF1INIT', 'HF2', 'HF3', 'HF4', 'STATIC', 'D_NEXT',
+               'HF1', 'HF1INIT', 'HF2', 'HF3', 'HF4', 'HF4_2', 'HF4_3',
+               'STATIC', 'D_NEXT',
                'D_INFLATE', 'SPREAD', 'NEXT', 'INFLATE', 'COPY', 'CSTATIC',
                'SEARCH', 'DISTANCE', 'CHECKSUM') # , encoding='one_hot')
 
@@ -91,6 +92,7 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte, i_addr,
     BITBITS = 9
 
     codeLength = [Signal(intbv()[4:]) for _ in range(MaxBitLength+2)]
+    bits = Signal(intbv()[4:])
     bitLengthCount = [Signal(intbv()[9:]) for _ in range(MaxCodeLength+1)]
     nextCode = [Signal(intbv()[CODEBITS:]) for _ in range(MaxCodeLength)]
     reverse = Signal(intbv()[CODEBITS:])
@@ -897,49 +899,60 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte, i_addr,
                     HF4_init.next = 0
                     print("to HF4")
 
+            elif state == d_state.HF4_2:
+
+                canonical = nextCode[bits]
+                nextCode[bits].next = nextCode[bits] + 1
+                if bits > MaxCodeLength:
+                    raise Error("too many bits: %d" % bits)
+                # print(canonical, bits)
+                reverse.next = rev_bits(canonical, bits)
+                # print("LEAF: ", spread_i, bits, reverse, canonical)
+                leaf.next = makeLeaf(spread_i, bits)
+                state.next = d_state.HF4_3
+
+            elif state == d_state.HF4_3:
+
+                if method == 4:
+                    d_leaves[reverse].next = leaf # makeLeaf(spread_i, bits)
+                    if bits <= d_instantMaxBit:
+                        if reverse + (1 << bits) <= d_instantMask:
+                            step.next = 1 << bits
+                            spread.next = reverse + (1 << bits)
+                            state.next = d_state.SPREAD
+                        else:
+                            spread_i.next = spread_i + 1
+                            state.next = d_state.HF4
+                    else:
+                        state.next = d_state.HF4
+                        spread_i.next = spread_i + 1
+                    HF4_init.next = 0
+                else:
+                    wleaf.next = leaf
+                    lwaddr.next = reverse
+                    # leaves[reverse].next = leaf # makeLeaf(spread_i, bits)
+                    code_bits[spread_i].next = reverse
+                    if bits <= instantMaxBit:
+                        if reverse + (1 << bits) <= instantMask:
+                            step.next = 1 << bits
+                            spread.next = reverse + (1 << bits)
+                            state.next = d_state.SPREAD
+                        else:
+                            spread_i.next = spread_i + 1
+                            state.next = d_state.HF4
+                    else:
+                        spread_i.next = spread_i + 1
+                        state.next = d_state.HF4
+                    HF4_init.next = 0
+
             elif state == d_state.HF4:
                 # create binary codes for each literal
 
                 if spread_i < numCodeLength:
-                    bits = codeLength[spread_i]
-                    if bits != 0:
-                        if HF4_init == 0:
-                            canonical = nextCode[bits]
-                            nextCode[bits].next = nextCode[bits] + 1
-                            if bits > MaxCodeLength:
-                                raise Error("too many bits: %d" % bits)
-                            # print(canonical, bits)
-                            reverse.next = rev_bits(canonical, bits)
-                            # print("LEAF: ", spread_i, bits, reverse, canonical)
-                            leaf.next = makeLeaf(spread_i, bits)
-                            HF4_init.next = 1
-                        elif method == 4:
-                            d_leaves[reverse].next = leaf # makeLeaf(spread_i, bits)
-                            if bits <= d_instantMaxBit:
-                                if reverse + (1 << bits) <= d_instantMask:
-                                    step.next = 1 << bits
-                                    spread.next = reverse + (1 << bits)
-                                    state.next = d_state.SPREAD
-                                else:
-                                    spread_i.next = spread_i + 1
-                            else:
-                                spread_i.next = spread_i + 1
-                            HF4_init.next = 0
-                        else:
-                            wleaf.next = leaf
-                            lwaddr.next = reverse
-                            # leaves[reverse].next = leaf # makeLeaf(spread_i, bits)
-                            code_bits[spread_i].next = reverse
-                            if bits <= instantMaxBit:
-                                if reverse + (1 << bits) <= instantMask:
-                                    step.next = 1 << bits
-                                    spread.next = reverse + (1 << bits)
-                                    state.next = d_state.SPREAD
-                                else:
-                                    spread_i.next = spread_i + 1
-                            else:
-                                spread_i.next = spread_i + 1
-                            HF4_init.next = 0
+                    bits_next = codeLength[spread_i]
+                    if bits_next != 0:
+                        bits.next = bits_next
+                        state.next = d_state.HF4_2
                     else:
                         spread_i.next = spread_i + 1
                 else:

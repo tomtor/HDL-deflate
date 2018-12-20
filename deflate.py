@@ -154,6 +154,7 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte, i_addr,
     filled = Signal(bool())
 
     ob1 = Signal(intbv()[8:])
+    copy1 = Signal(intbv()[8:])
     flush = Signal(bool(0))
 
     adler1 = Signal(intbv()[16:])
@@ -1162,15 +1163,22 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte, i_addr,
                 elif cur_i < length + 1:
                     oraddr.next = offset + cur_i
                     cur_i.next = cur_i + 1
+                    if cur_i == 1:
+                        copy1.next = orbyte
                     if cur_i > 1:
-                        # print("byte", orbyte)
+                        if offset + cur_i == do + 1:
+                            obyte.next = copy1
+                        else:
+                            obyte.next = orbyte
                         oaddr.next = do
-                        obyte.next = orbyte
                         o_oprogress.next = do + 1
                         do.next = do + 1
                 else:
                     oaddr.next = do
-                    obyte.next = orbyte
+                    if offset + cur_i == do + 1:
+                        copy1.next = orbyte
+                    else:
+                        obyte.next = orbyte
                     do.next = do + 1
                     o_oprogress.next = do + 1
                     cur_next.next = 0

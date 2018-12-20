@@ -39,7 +39,7 @@ def test_data(m):
                              for i in range(100)])
         b_data = str_data.encode('utf-8')
     elif m == 1:
-        str_data = " ".join(["Hello World! " + str(i) + " "
+        str_data = " ".join(["   Hello World! " + str(i) + "     "
                              for i in range(5)])
         b_data = str_data.encode('utf-8')
     elif m == 2:
@@ -94,7 +94,7 @@ class TestDeflate(unittest.TestCase):
             i = 0
             while i < len(zl_data):
                 if o_iprogress > i - MAXW:
-                    print("write", i)
+                    # print("write", i)
                     i_data.next = zl_data[i]
                     i_addr.next = i
                     i = i + 1

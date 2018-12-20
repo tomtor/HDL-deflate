@@ -290,6 +290,7 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte, i_addr,
             # print("carry:", carry, d >> (8 - carry))
             ob1.next = d >> (width - carry)
         else:
+            # print("put_adv:", ob1, d, doo)
             ob1.next = ob1 | (d << doo)
             # print("ob1.next", ob1 | (d << doo))
         do.next = do + pshift
@@ -534,7 +535,7 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte, i_addr,
                     ladler1.next = adler1_next
                     # print("in: ", bdata, di, isize)
                     state.next = d_state.SEARCH
-                    cur_search.next = di - 3
+                    cur_search.next = di - 1 # - 3
 
                 if not no_adv:
                     cur_cstatic.next = cur_cstatic + 1
@@ -547,8 +548,8 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte, i_addr,
                     # print("DISTANCE", di, do, cur_i, cur_dist)
                     nextdist = CopyDistance[cur_i+1]
                     if nextdist > cur_dist:
-                        print("Found distance", cur_i)
                         copydist = CopyDistance[cur_i]
+                        # print("Found distance", copydist)
                         extra_dist = cur_dist - copydist
                         # print("extra dist", extra_dist)
                         extra_bits = ExtraDistanceBits[cur_i // 2]

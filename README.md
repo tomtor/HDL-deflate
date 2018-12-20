@@ -34,9 +34,9 @@ better to use a more dense coding in your FPGA application data in the first pla
 
 Resource|Estimation
 --------|----------
-LUT	|8073
+LUT	|7466
 LUTRAM	|776
-FF	|2862
+FF	|2248
 BRAM	|4
 
 # Future Improvements (when there is interest)

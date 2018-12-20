@@ -108,6 +108,7 @@ class TestDeflate(unittest.TestCase):
             i_mode.next = IDLE
             print("Wrote input, wait for end of decompression")
 
+            # alternative without sliding window:
             """
             print("WRITE")
             i_mode.next = WRITE
@@ -287,8 +288,6 @@ def test_deflate_bench(i_clk, o_led, led0_g, led1_b, led2_r):
     CDATA = tuple(c_data)
     UDATA = tuple(u_data)
 
-    d_data = [Signal(intbv()[8:]) for _ in range(len(u_data))]
-
     i_mode = Signal(intbv(0)[3:])
     o_done = Signal(bool(0))
 
@@ -312,7 +311,7 @@ def test_deflate_bench(i_clk, o_led, led0_g, led1_b, led2_r):
     tstate = Signal(tb_state.RESET)
 
     tbi = Signal(modbv(0)[15:])
-    # ud = Signal(intbv()[8:])
+    copy = Signal(intbv()[8:])
 
     scounter = Signal(modbv(0)[SLOWDOWN:])
     counter = Signal(modbv(0)[16:])
@@ -424,7 +423,6 @@ def test_deflate_bench(i_clk, o_led, led0_g, led1_b, led2_r):
                 led2_r.next = not led2_r
                 ud1= UDATA[tbi]
                 # print(o_byte, ud1)
-                d_data[tbi].next = o_byte
                 if o_byte != ud1:
                     i_mode.next = IDLE
                     print("FAIL", len(UDATA), tbi, o_byte, ud1)
@@ -502,37 +500,26 @@ def test_deflate_bench(i_clk, o_led, led0_g, led1_b, led2_r):
 
         # verify compression
         elif tstate == tb_state.CRESULT:
-            # print("GET COMPRESS RESULT", tbi, o_data)
+            # print("COPY COMPRESS RESULT", tbi, o_data)
             led2_r.next = 0
             o_led.next = tbi
             if wtick:
+                if tbi > 0:
+                    i_mode.next = WRITE
+                    i_data.next = copy
+                    i_addr.next = tbi - 1
                 wtick.next = False
-            elif tbi < resultlen:
-                led1_b.next = not led1_b
-                if tbi >= 0:
-                    d_data[tbi].next = o_byte
                 tbi.next = tbi + 1
-                i_addr.next = tbi + 1
+            elif tbi < resultlen:
+                i_mode.next = READ
+                led1_b.next = not led1_b
+                i_addr.next = tbi
+                copy.next = o_byte
                 wtick.next = True
             else:
-                print("Compress bytes read", resultlen, tbi - 1)
+                print("Compress output bytes copied to input", resultlen, tbi - 1)
                 i_mode.next = IDLE
                 tbi.next = 0
-                tstate.next = tb_state.VWRITE
-
-        elif tstate == tb_state.VWRITE:
-            led1_b.next = 0
-            o_led.next = tbi
-            if tbi < resultlen:
-                # print(tbi, d_data[tbi])
-                led2_r.next = not led2_r
-                i_mode.next = WRITE
-                i_data.next = d_data[tbi]
-                i_addr.next = tbi
-                tbi.next = tbi + 1
-            else:
-                print("did write compress bytes", tbi)
-                i_mode.next = IDLE
                 tstate.next = tb_state.VDECOMPRESS
 
         elif tstate == tb_state.VDECOMPRESS:
@@ -562,7 +549,6 @@ def test_deflate_bench(i_clk, o_led, led0_g, led1_b, led2_r):
             elif tbi < len(UDATA):
                 ud2 = UDATA[tbi]
                 # print(tbi, o_byte, ud2)
-                d_data[tbi].next = o_byte
                 if o_byte != ud2:
                     tstate.next = tb_state.RESET
                     i_mode.next = IDLE
@@ -605,7 +591,7 @@ def test_deflate_bench(i_clk, o_led, led0_g, led1_b, led2_r):
         return dut, count, logic
 
 
-if 0: # not COSIMULATION:
+if 1: # not COSIMULATION:
     SLOWDOWN = 22
 
     tb = test_deflate_bench(Signal(bool(0)), Signal(intbv(0)[4:]),

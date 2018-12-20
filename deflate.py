@@ -640,7 +640,8 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte, i_addr,
                             # print("distance", distance)
                             cur_dist.next = distance
                             cur_i.next = 0
-                            adv(match * 8)
+                            # adv(match * 8)
+                            di.next = di + match
                             cur_cstatic.next = cur_cstatic + match - 1
                             length.next = match
                             state.next = d_state.DISTANCE
@@ -648,7 +649,8 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte, i_addr,
                             cur_search.next = cur_search - 1
                     else:
                         bdata = iram[di]
-                        adv(8)
+                        # adv(8)
+                        di.next = di + 1
                         outlen = codeLength[bdata]
                         outbits = code_bits[bdata]
                         # print("CBITS:", bdata, outlen, outbits)

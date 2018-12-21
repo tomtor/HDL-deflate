@@ -50,8 +50,8 @@ def test_data(m):
     elif m == 3:
         b_data = bytes([random.randrange(0,0x100) for i in range(100)])
     elif m == 4:
-        str_data = " ".join(["Hi: 1111  Hi: 2106  Hi: 1967  Hi: 4092  Hi: 13 "
-                             for i in range(10)])
+        str_data = "".join([str(random.randrange(0,2))
+                             for i in range(1000)])
         b_data = str_data.encode('utf-8')
     else:
         raise Error("unknown test mode")

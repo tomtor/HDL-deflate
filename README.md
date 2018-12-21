@@ -41,6 +41,6 @@ BRAM	|4
 
 # Future Improvements (when there is interest)
 
-* Reduce LUT usage
+* ~~Reduce LUT usage~~
 * Improve speed from current 80Mhz to 100Mhz
 * Improve compression performance

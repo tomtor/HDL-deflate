@@ -153,9 +153,6 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte, i_addr,
     nb = Signal(intbv()[3:])
 
     filled = Signal(bool())
-    wtick = Signal(intbv()[2:])
-    prevbyte = Signal(intbv()[8:])
-    prevprevbyte = Signal(intbv()[8:])
 
     ob1 = Signal(intbv()[8:])
     copy1 = Signal(intbv()[8:])
@@ -1068,7 +1065,6 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte, i_addr,
                 # cur_next.next = 0
                 cur_i.next = 0
                 oraddr.next = do - distance
-                wtick.next = 2
                 state.next = d_state.COPY
 
             elif state == d_state.INFLATE:
@@ -1128,8 +1124,6 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte, i_addr,
                                 length.next = tlength
                                 cur_i.next = 0
                                 oraddr.next = do - distance
-                                filled.next = False
-                                wtick.next = 2
                                 state.next = d_state.COPY
                             else:
                                 # raise Error("TO DO")
@@ -1142,9 +1136,6 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte, i_addr,
                     filled.next = True
                 elif nb < 4:
                     pass
-                elif wtick:
-                    oraddr.next = offset
-                    wtick.next = wtick - 1
                 elif method == 0:
                     if cur_i < length:
                         oaddr.next = do
@@ -1163,40 +1154,23 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte, i_addr,
                     oraddr.next = offset + cur_i
                     if cur_i == 1:
                         copy1.next = orbyte
-                        prevprevbyte.next = orbyte
-                        print("COPY1", orbyte)
-                        print("c1", cur_i, length, offset, do, orbyte)
+                        # print("c1", cur_i, length, offset, do, orbyte)
                     if cur_i == 3:
-                         copy2.next = orbyte
-                         print("COPY2A", orbyte)
+                        copy2.next = orbyte
                     if cur_i > 1:
+                        # Special 1 byte offset handling:
                         if offset + cur_i == do + 1:
-                            print("c2", di, do, copy1)
                             obyte.next = copy1
-                        else:
-                            #if offset + cur_i == do - 2:
-                            #if offset + cur_i == do - 1:
-                            if offset + cur_i == do:
-                                print("POR", prevprevbyte, orbyte, copy1)
-                                if cur_i == 3:
-                                    obyte.next = orbyte
-                                elif cur_i > 2:
-                                    if cur_i & 1:
-                                        obyte.next = copy2
-                                        print("> odd", copy1, copy2)
-                                    else:
-                                        obyte.next = copy1
-                                        print("> even", copy2, copy1)
-                                else:
-                                    obyte.next = copy1 # prevprevbyte
-                                    # copy2.next = orbyte
-                                    # print("COPY2", orbyte)
-                                    print("<", copy1)
+                        elif cur_i == 3 or offset + cur_i != do:
+                             obyte.next = orbyte
+                        # Special 2 byte offset handling:
+                        elif cur_i > 2:
+                            if cur_i & 1:
+                                obyte.next = copy2
                             else:
-                                # oraddr.next = offset + cur_i
-                                print("OR", orbyte)
-                                obyte.next = orbyte
-                        #prevbyte.next = orbyte
+                                obyte.next = copy1
+                        else:  # cur_i == 2
+                            obyte.next = copy1
                         oaddr.next = do
                         o_oprogress.next = do + 1
                         do.next = do + 1

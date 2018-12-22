@@ -23,8 +23,8 @@ By default the compressor will reduce repeated 3/4/5 byte sequences in the searc
 This will result in a decent compression ratio for many real life input data patterns.
 
 At the expense of additional LUTs one can improve this by enlarging the `CWINDOW` or expanding
-the matching code to include 6/7/8/9/10 byte matches. This code is commented out in FSM state
-`d_state.SEARCH` around line 600 in `deflate.py`.
+the matching code to include 6/7/8/9/10 byte matches. Set `MATCH10` to `True` in the top of `deflate.py`
+to activate this option.
 
 Another strategy for data sets with just a small set of used byte values would be
 to use a dedicated pre-computed Huffman tree. I could add this if there is interest, but it is probably

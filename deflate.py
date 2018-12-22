@@ -22,6 +22,8 @@ CWINDOW = 32    # Search window for compression
 OBSIZE = 8192   # Size of output buffer (BRAM)
 IBSIZE = 4 * CWINDOW  # 2048   # Size of input buffer (LUT-RAM)
 
+MATCH10 = True
+
 if OBSIZE > IBSIZE:
     LBSIZE = log2(OBSIZE)
 else:
@@ -600,7 +602,7 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte, i_addr,
                             lencode = 257
                             match = 3
 
-                            if di < isize - 4 and \
+                            if MATCH10 and di < isize - 4 and \
                                     iram[cur_search+3 & IBS] == b4: # iram[di + 3 & IBS]:
                                 lencode = 258
                                 match = 4
@@ -608,7 +610,6 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte, i_addr,
                                         iram[cur_search+4 & IBS] == iram[di + 4 & IBS]:
                                     lencode = 259
                                     match = 5
-                            """
                                     if di < isize - 6 and \
                                             iram[cur_search+5 & IBS] == iram[di + 5 & IBS]:
                                         lencode = 260
@@ -629,6 +630,7 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte, i_addr,
                                                             iram[cur_search+9 & IBS] == iram[di + 9 & IBS]:
                                                         lencode = 264
                                                         match = 10
+                            """
                             """
                             print("found:", cur_search, di, isize, match)
                             outlen = codeLength[lencode]

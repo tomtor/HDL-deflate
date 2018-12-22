@@ -22,7 +22,7 @@ CWINDOW = 32    # Search window for compression
 OBSIZE = 8192   # Size of output buffer (BRAM)
 IBSIZE = 4 * CWINDOW  # 2048   # Size of input buffer (LUT-RAM)
 
-MATCH10 = True
+MATCH10 = False
 
 if OBSIZE > IBSIZE:
     LBSIZE = log2(OBSIZE)

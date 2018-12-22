@@ -32,11 +32,22 @@ better to use a more dense coding in your FPGA application data in the first pla
 
 # FPGA validation
 
+## Default
+
 Resource|Estimation
 --------|----------
 LUT	|6823
 LUTRAM	|776
 FF	|2225
+BRAM	|4
+
+## MATCH10
+
+Resource|Estimation
+--------|----------
+LUT	|12073
+LUTRAM	|488
+FF	|3316
 BRAM	|4
 
 # Future Improvements (when there is interest)

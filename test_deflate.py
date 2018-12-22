@@ -7,7 +7,8 @@ from myhdl import delay, now, Signal, intbv, ResetSignal, Simulation, \
                   Cosimulation, block, instance, StopSimulation, modbv, \
                   always, always_seq, always_comb, enum, Error
 
-from deflate import IDLE, WRITE, READ, STARTC, STARTD, LBSIZE, IBSIZE, CWINDOW
+from deflate import IDLE, WRITE, READ, STARTC, STARTD, LBSIZE, IBSIZE, \
+                    CWINDOW, COMPRESS
 
 MAXW = 2 * CWINDOW
 
@@ -55,7 +56,7 @@ def test_data(m):
         b_data = str_data.encode('utf-8')
     else:
         raise Error("unknown test mode")
-    b_data = b_data[:IBSIZE-4]
+    b_data = b_data[:IBSIZE - 4 - 20]
     zl_data = zlib.compress(b_data)
     print("From %d to %d bytes" % (len(b_data), len(zl_data)))
     print(zl_data)
@@ -446,7 +447,10 @@ def test_deflate_bench(i_clk, o_led, led0_g, led1_b, led2_r):
                 print("DECOMPRESS test OK!, pausing", tbi)
                 i_mode.next = IDLE
                 tbi.next = 0
-                tstate.next = tb_state.PAUSE
+                if not COMPRESS:
+                    tstate.next = tb_state.CPAUSE
+                else:
+                    tstate.next = tb_state.PAUSE
                 # tstate.next = tb_state.HALT
                 # state.next = tb_state.CPAUSE
                 resume.next = 1
@@ -568,14 +572,14 @@ def test_deflate_bench(i_clk, o_led, led0_g, led1_b, led2_r):
                 led2_r.next = 0
                 i_mode.next = IDLE
                 resume.next = 1
-                if SLOWDOWN <= 4:
-                    raise StopSimulation()
                 """
                 """
                 tstate.next = tb_state.CPAUSE
                 # tstate.next = tb_state.HALT
 
         elif tstate == tb_state.CPAUSE:
+            if SLOWDOWN <= 4:
+                raise StopSimulation()
             if resume == 0:
                 print("--------------RESET-------------")
                 o_led.next = o_led + 1
@@ -595,7 +599,7 @@ def test_deflate_bench(i_clk, o_led, led0_g, led1_b, led2_r):
         return dut, count, logic
 
 
-if 0: # not COSIMULATION:
+if 1: # not COSIMULATION:
     SLOWDOWN = 22
 
     tb = test_deflate_bench(Signal(bool(0)), Signal(intbv(0)[4:]),

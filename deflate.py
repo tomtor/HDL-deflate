@@ -22,9 +22,9 @@ CWINDOW = 32    # Search window for compression
 OBSIZE = 8192   # Size of output buffer (BRAM)
 IBSIZE = 4 * CWINDOW  # 2048   # Size of input buffer (LUT-RAM)
 
+COMPRESS = True
 MATCH10 = False
-
-FAST = True
+FAST = False
 
 if OBSIZE > IBSIZE:
     LBSIZE = log2(OBSIZE)
@@ -341,19 +341,20 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte, i_addr,
     def get_code(aleaf):
         return (aleaf >> BITBITS)  # & ((1 << CODEBITS) - 1)
 
+    @block
+    def matcher3(o_m, mi):
+        @always_comb
+        def logic():
+            o_m.next = ((iram[di-1-mi & IBS] == iram[di & IBS])
+                        and (iram[di-mi & IBS] == iram[di+1 & IBS])
+                        and (iram[di+1-mi & IBS] == iram[di+2 & IBS]))
+        return logic
+
     if FAST:
         smatch = [Signal(bool()) for _ in range(CWINDOW)]
-
-        @block
-        def matcher3(o_m, mi):
-            @always_comb
-            def logic():
-                o_m.next = ((iram[di-1-mi] == iram[di-mi])
-                            and (iram[di-mi] == iram[di+1-mi])
-                            and (iram[di+1-mi] == iram[di+2-mi]))
-            return logic
-
         matchers = [matcher3(smatch[mi], mi) for mi in range(CWINDOW)]
+    else:
+        smatch = [Signal(bool())]
 
     @always(clk.posedge)
     def io_logic():
@@ -384,7 +385,7 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte, i_addr,
 
             if state == d_state.IDLE:
 
-                if i_mode == STARTC:
+                if COMPRESS and i_mode == STARTC:
 
                     print("STARTC")
                     do_compress.next = True
@@ -473,7 +474,9 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte, i_addr,
                 # print("CSTATIC", cur_i, ob1, do, doo, isize)
 
                 no_adv = 0
-                if not filled:
+                if not COMPRESS:
+                    pass
+                elif not filled:
                     no_adv = 1
                     filled.next = True
                 elif nb < 4:
@@ -555,14 +558,16 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte, i_addr,
                     ladler1.next = adler1_next
                     # print("in: ", bdata, di, isize)
                     state.next = d_state.SEARCH
-                    cur_search.next = di - 1 # - 3
+                    cur_search.next = di - 1
 
                 if not no_adv:
                     cur_cstatic.next = cur_cstatic + 1
 
             elif state == d_state.DISTANCE:
 
-                if flush:
+                if not COMPRESS:
+                    pass
+                elif flush:
                     do_flush()
                 else:
                     # print("DISTANCE", di, do, cur_i, cur_dist)
@@ -590,7 +595,9 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte, i_addr,
 
             elif state == d_state.CHECKSUM:
 
-                if cur_i < di:
+                if not COMPRESS:
+                    pass
+                elif cur_i < di:
                     # print("CHECKSUM", cur_i, di, iram[cur_i])
                     bdata = iram[cur_i & IBS]
                     adler1_next = (adler1 + bdata) % 65521
@@ -603,7 +610,9 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte, i_addr,
 
             elif state == d_state.SEARCH:
 
-                if not filled:
+                if not COMPRESS:
+                    pass
+                elif not filled:
                     filled.next = True
                 elif nb < 4:
                     pass
@@ -611,14 +620,81 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte, i_addr,
                     if cur_search >= 0 \
                              and cur_search >= di - CWINDOW \
                              and di < isize - 3:
-                        if iram[cur_search & IBS] == b1 and \
+
+                        if FAST:
+                            fmatch = CWINDOW
+                            for si in range(CWINDOW):
+                                # print("test", di, si, di - si - 1)
+                                if di - si - 1 >= 0 and smatch[si]:
+                                    # print("fmatch", si)
+                                    fmatch = si
+                                    break
+                            if fmatch == CWINDOW:
+                                cur_search.next = -1
+                                # print("NO FSEARCH")
+                            else:
+                                distance = fmatch + 1
+                                # print("FSEARCH", distance)
+                                fmatch = di - fmatch + 3
+                                # Length is 3 code
+                                lencode = 257
+                                match = 3
+
+                                if di < isize - 4 and \
+                                        iram[fmatch & IBS] == b4: # iram[di + 3 & IBS]:
+                                    lencode = 258
+                                    match = 4
+                                    if di < isize - 5 and \
+                                            iram[fmatch & IBS] == iram[di + 4 & IBS]:
+                                        lencode = 259
+                                        match = 5
+                                        if MATCH10 and di < isize - 6 and \
+                                                iram[fmatch & IBS] == iram[di + 5 & IBS]:
+                                            lencode = 260
+                                            match = 6
+                                            if di < isize - 7 and \
+                                                    iram[fmatch & IBS] == iram[di + 6 & IBS]:
+                                                lencode = 261
+                                                match = 7
+                                                if di < isize - 8 and \
+                                                        iram[fmatch & IBS] == iram[di + 7 & IBS]:
+                                                    lencode = 262
+                                                    match = 8
+                                                    if di < isize - 9 and \
+                                                            iram[fmatch & IBS] == iram[di + 8 & IBS]:
+                                                        lencode = 263
+                                                        match = 9
+                                                        if di < isize - 10 and \
+                                                                iram[fmatch & IBS] == iram[di + 9 & IBS]:
+                                                            lencode = 264
+                                                            match = 10
+
+                                print("fast:", distance, di, isize, match)
+                                outlen = codeLength[lencode]
+                                outbits = code_bits[lencode]
+                                # print("BITS:", outlen, outbits)
+                                oaddr.next = do
+                                obyte.next = put(outbits, outlen)
+                                put_adv(outbits, outlen)
+
+                                # distance = di - cur_search
+                                # print("distance", distance)
+                                cur_dist.next = distance
+                                cur_i.next = 0
+                                # adv(match * 8)
+                                di.next = di + match
+                                cur_cstatic.next = cur_cstatic + match - 1
+                                length.next = match
+                                state.next = d_state.DISTANCE
+
+                        elif iram[cur_search & IBS] == b1 and \
                                 iram[cur_search+1 & IBS] == b2 and \
                                 iram[cur_search+2 & IBS] == b3:
                             # Length is 3 code
                             lencode = 257
                             match = 3
 
-                            if MATCH10 and di < isize - 4 and \
+                            if di < isize - 4 and \
                                     iram[cur_search+3 & IBS] == b4: # iram[di + 3 & IBS]:
                                 lencode = 258
                                 match = 4
@@ -626,7 +702,7 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte, i_addr,
                                         iram[cur_search+4 & IBS] == iram[di + 4 & IBS]:
                                     lencode = 259
                                     match = 5
-                                    if di < isize - 6 and \
+                                    if MATCH10 and di < isize - 6 and \
                                             iram[cur_search+5 & IBS] == iram[di + 5 & IBS]:
                                         lencode = 260
                                         match = 6
@@ -647,7 +723,6 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte, i_addr,
                                                         lencode = 264
                                                         match = 10
 
-                            # print("M1", smatch[0])
                             print("found:", cur_search, di, isize, match)
                             outlen = codeLength[lencode]
                             outbits = code_bits[lencode]
@@ -668,6 +743,7 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte, i_addr,
                         else:
                             cur_search.next = cur_search - 1
                     else:
+                        # print("NO MATCH")
                         bdata = iram[di]
                         # adv(8)
                         di.next = di + 1
@@ -1202,7 +1278,10 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte, i_addr,
                 print("unknown state?!")
                 state.next = d_state.IDLE
 
-    return io_logic, logic, fill_buf, oramwrite, oramread, matchers
+    if FAST:
+        return io_logic, logic, fill_buf, oramwrite, oramread, matchers
+    else:
+        return io_logic, logic, fill_buf, oramwrite, oramread
 
 
 if __name__ == "__main__":

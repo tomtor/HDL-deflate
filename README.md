@@ -19,6 +19,8 @@ One can use a sliding window to reduce the size of the input buffer and the LUT-
 The optimal value is 4 * CWINDOW (128 bytes), the first decompression in the UnitTest in `test_deflate.py`
 uses this strategy.
 
+The compress mode can be disabled by setting `COMPRESS` to `False`.
+
 By default the compressor will reduce repeated 3/4/5 byte sequences in the search window to 15 bit.
 This will result in a decent compression ratio for many real life input data patterns.
 
@@ -39,6 +41,15 @@ Resource|Estimation
 LUT	|7253
 LUTRAM	|704
 FF	|2263
+BRAM	|4
+
+## Compress False
+
+Resource|Estimation
+--------|----------
+LUT	|5769
+LUTRAM	|512
+FF	|2169
 BRAM	|4
 
 ## MATCH10

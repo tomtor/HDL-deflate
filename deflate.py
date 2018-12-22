@@ -24,6 +24,8 @@ IBSIZE = 4 * CWINDOW  # 2048   # Size of input buffer (LUT-RAM)
 
 MATCH10 = False
 
+FAST = True
+
 if OBSIZE > IBSIZE:
     LBSIZE = log2(OBSIZE)
 else:
@@ -339,6 +341,20 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte, i_addr,
     def get_code(aleaf):
         return (aleaf >> BITBITS)  # & ((1 << CODEBITS) - 1)
 
+    if FAST:
+        smatch = [Signal(bool()) for _ in range(CWINDOW)]
+
+        @block
+        def matcher3(o_m, mi):
+            @always_comb
+            def logic():
+                o_m.next = ((iram[di-1-mi] == iram[di-mi])
+                            and (iram[di-mi] == iram[di+1-mi])
+                            and (iram[di+1-mi] == iram[di+2-mi]))
+            return logic
+
+        matchers = [matcher3(smatch[mi], mi) for mi in range(CWINDOW)]
+
     @always(clk.posedge)
     def io_logic():
         if i_mode == WRITE:
@@ -630,8 +646,8 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte, i_addr,
                                                             iram[cur_search+9 & IBS] == iram[di + 9 & IBS]:
                                                         lencode = 264
                                                         match = 10
-                            """
-                            """
+
+                            # print("M1", smatch[0])
                             print("found:", cur_search, di, isize, match)
                             outlen = codeLength[lencode]
                             outbits = code_bits[lencode]
@@ -1186,7 +1202,7 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte, i_addr,
                 print("unknown state?!")
                 state.next = d_state.IDLE
 
-    return io_logic, logic, fill_buf, oramwrite, oramread
+    return io_logic, logic, fill_buf, oramwrite, oramread, matchers
 
 
 if __name__ == "__main__":

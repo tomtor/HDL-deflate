@@ -18,7 +18,10 @@ from myhdl import always, block, Signal, intbv, Error, ResetSignal, \
 IDLE, RESET, WRITE, READ, STARTC, STARTD = range(6)
 
 COMPRESS = True
+MATCH10 = True
 MATCH10 = False
+
+FAST = False
 FAST = True
 
 CWINDOW = 32    # Search window for compression
@@ -27,11 +30,12 @@ OBSIZE = 8192   # Size of output buffer (BRAM)
 IBSIZE = 4 * CWINDOW  # 2048   # Size of input buffer (LUT-RAM)
 
 if OBSIZE > IBSIZE:
-    LBSIZE = log2(OBSIZE)
+    LBSIZE = int(log2(OBSIZE))
 else:
-    LBSIZE = log2(IBSIZE)
+    LBSIZE = int(log2(IBSIZE))
 
-IBS = (1 << int(log2(IBSIZE))) - 1
+LIBSIZE = int(log2(IBSIZE))
+IBS = (1 << LIBSIZE) - 1
 
 d_state = enum('IDLE', 'HEADER', 'BL', 'READBL', 'REPEAT', 'DISTTREE', 'INIT3',
                'HF1', 'HF1INIT', 'HF2', 'HF3', 'HF4', 'HF4_2', 'HF4_3',
@@ -72,6 +76,8 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte, i_addr,
     oraddr = Signal(intbv()[LBSIZE:])
     obyte = Signal(intbv()[8:])
     orbyte = Signal(intbv()[8:])
+
+    iraddr = Signal(intbv()[LIBSIZE:])
 
     isize = Signal(intbv()[LBSIZE:])
     state = Signal(d_state.IDLE)
@@ -165,6 +171,7 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte, i_addr,
     copy1 = Signal(intbv()[8:])
     copy2 = Signal(intbv()[8:])
     flush = Signal(bool(0))
+    wtick = Signal(bool(0))
 
     adler1 = Signal(intbv()[16:])
     adler2 = Signal(intbv()[16:])
@@ -185,7 +192,7 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte, i_addr,
     def matcher3(o_m, mi):
         @always_comb
         def logic():
-            o_m.next = ((cwindow >> mi) & 0xFFFFFF) == (b14 >> 8)
+            o_m.next = ((concat(cwindow,b1,b2) >> (8 * mi)) & 0xFFFFFF) == (b14 >> 8)
         return logic
 
     if FAST:
@@ -193,9 +200,9 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte, i_addr,
         cwindow = Signal(modbv()[8 * CWINDOW:])
         matchers = [matcher3(smatch[mi], mi) for mi in range(CWINDOW)]
     else:
+        cwindow = Signal(bool())
         smatch = [Signal(bool())]
 
-    """
     @always(clk.posedge)
     def fill_buf():
         if not reset:
@@ -205,14 +212,32 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte, i_addr,
             b2.next = 0
             b3.next = 0
             b4.next = 0
+            old_di.next = 0
         else:
             if isize < 4:
                 pass
             elif i_mode == STARTC or i_mode == STARTD:
                 nb.next = 0
+                old_di.next = 0
             else:
-                # print("FILL", di, isize)
-                nb.next = 4
+                """
+                if do_compress:
+                    print("FILL", di, old_di, nb, b1, b2, b3, b4)
+                """
+                if FAST: # and nb == 4:
+                    shift = (di - old_di) * 8
+                    """
+                    if shift != 0:
+                        print("shift", shift, cwindow, b1, b2, b3, b4)
+                    """
+                    cwindow.next = (cwindow << shift) | (b14 >> (32 - shift))
+
+                if old_di == di:
+                    nb.next = 4
+                    # wtick.next = True
+                old_di.next = di
+
+                # iraddr.next = di
                 b1.next = iram[di & IBS]
                 b2.next = iram[di+1 & IBS]
                 b3.next = iram[di+2 & IBS]
@@ -237,7 +262,8 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte, i_addr,
                 delta = di - old_di
                 if delta == 1:
                     # print("delta == 1")
-                    cwindow.next = (cwindow << 8) | b1
+                    if FAST:
+                        cwindow.next = (cwindow << 8) | b1
                     b1.next = b2
                     b2.next = b3
                     b3.next = b4
@@ -245,20 +271,23 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte, i_addr,
                     # nb.next = 4
                 elif delta == 2:
                     print("delta == 2")
-                    cwindow.next = (cwindow << 16) | (b14 >> 16)
+                    if FAST:
+                        cwindow.next = (cwindow << 16) | (b14 >> 16)
                     b1.next = b3
                     b2.next = b4
                     b3.next = iram[di+2 & IBS]
                     nb.next = 3
                 elif delta == 3:
-                    print("delta == 2")
-                    cwindow.next = (cwindow << 24) | (b14 >> 8)
+                    print("delta == 3")
+                    if FAST:
+                        cwindow.next = (cwindow << 24) | (b14 >> 8)
                     b1.next = b4
                     b2.next = iram[di+1 & IBS]
                     nb.next = 2
                 elif delta == 4:
-                    raise Error("delta 4")
-                    cwindow.next = (cwindow << 32) | (b14)
+                    print("delta == 4")
+                    if FAST:
+                        cwindow.next = (cwindow << 32) | (b14)
                     b1.next = iram[di & IBS]
                     nb.next = 1
                 else:
@@ -283,6 +312,7 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte, i_addr,
             else:
                 pass
             old_di.next = di
+    """
 
     def get4(boffset, width):
         if nb != 4:
@@ -642,7 +672,7 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte, i_addr,
                             for si in range(CWINDOW):
                                 # print("test", di, si, di - si - 1)
                                 if smatch[si]:
-                                    # print("fmatch", si)
+                                    print("fmatch", si)
                                     fmatch = si
                                     found = 1
                                     break
@@ -657,12 +687,14 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte, i_addr,
                                 lencode = 257
                                 match = 3
 
-                                if di < isize - 4 and \
-                                        iram[fmatch & IBS] == b4: # iram[di + 3 & IBS]:
+                                if False and di < isize - 4 and \
+                                        iram[fmatch & IBS] == b4:
+                                        #(cwindow >> (8 * (fmatch-1))) & 0xFF == b4:
                                     lencode = 258
                                     match = 4
-                                    if di < isize - 5 and \
-                                            iram[fmatch & IBS] == iram[di + 4 & IBS]:
+                                    if False and di < isize - 5 and fmatch > 1 and \
+                                            (cwindow >> (8 * (fmatch-2))) & 0xFF == iram[di + 4 & IBS]:
+                                            # iram[fmatch & IBS] == iram[di + 4 & IBS]:
                                         lencode = 259
                                         match = 5
                                         if MATCH10 and di < isize - 6 and \
@@ -1185,7 +1217,7 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte, i_addr,
                     elif nb < 4:  # nb <= 2 or (nb == 3 and dio > 1):
                         # print("EXTRA FETCH", nb, dio)
                         pass  # fetch more bytes
-                    elif di > isize - 3:  # checksum is 4 bytes
+                    elif di > isize:  # - 3:  # checksum is 4 bytes
                         state.next = d_state.IDLE
                         o_done.next = True
                         print("NO EOF ", di)

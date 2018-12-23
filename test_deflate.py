@@ -10,7 +10,7 @@ from myhdl import delay, now, Signal, intbv, ResetSignal, Simulation, \
 from deflate import IDLE, WRITE, READ, STARTC, STARTD, LBSIZE, IBSIZE, \
                     CWINDOW, COMPRESS
 
-MAXW = CWINDOW
+MAXW = 2 * CWINDOW
 
 COSIMULATION = True
 COSIMULATION = False
@@ -56,6 +56,7 @@ def test_data(m):
         b_data = str_data.encode('utf-8')
     else:
         raise Error("unknown test mode")
+    # print(str_data)
     b_data = b_data[:IBSIZE - 4 - 20]
     zl_data = zlib.compress(b_data)
     print("From %d to %d bytes" % (len(b_data), len(zl_data)))
@@ -105,7 +106,8 @@ class TestDeflate(unittest.TestCase):
                     i_addr.next = i
                     i = i + 1
                 else:
-                    print("Wait for space")
+                    # print("Wait for space")
+                    pass
                 tick()
                 yield delay(5)
                 tick()

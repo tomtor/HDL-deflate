@@ -163,6 +163,7 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte, i_addr,
 
     b14 = ConcatSignal(b1, b2, b3, b4)
     b14._markUsed()
+    b15 = ConcatSignal(b1, b2, b3, b4, b5)
 
     if MATCH10:
         b6 = Signal(intbv()[8:])
@@ -240,25 +241,21 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte, i_addr,
                 if do_compress:
                     print("FILL", di, old_di, nb, b1, b2, b3, b4)
                 """
-                if FAST: # and nb == 4:
+                if FAST:
                     shift = (di - old_di) * 8
                     """
                     if shift != 0:
                         print("shift", shift, cwindow, b1, b2, b3, b4)
                     """
-                    if shift <= 32:
-                        cwindow.next = (cwindow << shift) | (b14 >> (32 - shift))
-                    elif shift == 40:
-                        cwindow.next = (cwindow << shift) | (b14 << 8) | b5
-                    elif MATCH10:
+                    if MATCH10:
                         cwindow.next = (cwindow << shift) | (b110 >> (80 - shift))
+                    else:
+                        cwindow.next = (cwindow << shift) | (b15 >> (40 - shift))
 
                 if old_di == di:
                     nb.next = 4
-                    # wtick.next = True
                 old_di.next = di
 
-                # iraddr.next = di
                 b1.next = iram[di & IBS]
                 b2.next = iram[di+1 & IBS]
                 b3.next = iram[di+2 & IBS]
@@ -270,77 +267,6 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte, i_addr,
                     b8.next = iram[di+7 & IBS]
                     b9.next = iram[di+8 & IBS]
                     b10.next = iram[di+9 & IBS]
-    """
-    @always(clk.posedge)
-    def fill_buf():
-        if not reset:
-            print("FILL RESET")
-            nb.next = 0
-            old_di.next = 0
-            b1.next = 0
-            b2.next = 0
-            b3.next = 0
-            b4.next = 0
-        else:
-            if isize < 4:
-                pass
-            elif i_mode == STARTC or i_mode == STARTD:
-                nb.next = 0
-            elif not filled and nb == 4 and di - old_di <= 4:
-                delta = di - old_di
-                if delta == 1:
-                    # print("delta == 1")
-                    if FAST:
-                        cwindow.next = (cwindow << 8) | b1
-                    b1.next = b2
-                    b2.next = b3
-                    b3.next = b4
-                    b4.next = iram[di+3 & IBS]
-                    # nb.next = 4
-                elif delta == 2:
-                    print("delta == 2")
-                    if FAST:
-                        cwindow.next = (cwindow << 16) | (b14 >> 16)
-                    b1.next = b3
-                    b2.next = b4
-                    b3.next = iram[di+2 & IBS]
-                    nb.next = 3
-                elif delta == 3:
-                    print("delta == 3")
-                    if FAST:
-                        cwindow.next = (cwindow << 24) | (b14 >> 8)
-                    b1.next = b4
-                    b2.next = iram[di+1 & IBS]
-                    nb.next = 2
-                elif delta == 4:
-                    print("delta == 4")
-                    if FAST:
-                        cwindow.next = (cwindow << 32) | (b14)
-                    b1.next = iram[di & IBS]
-                    nb.next = 1
-                else:
-                    pass
-            elif not filled or nb == 0:
-                print("nb = 0")
-                b1.next = iram[di & IBS]
-                nb.next = 1
-            elif not filled or nb == 1:
-                print("nb = 1")
-                b2.next = iram[di+1 & IBS]
-                nb.next = 2
-            elif not filled or nb == 2:
-                print("nb = 2")
-                # raise Error("nb == 2")
-                b3.next = iram[di+2 & IBS]
-                nb.next = 3
-            elif not filled or nb == 3:
-                print("nb = 3")
-                b4.next = iram[di+3 & IBS]
-                nb.next = 4
-            else:
-                pass
-            old_di.next = di
-    """
 
     def get4(boffset, width):
         if nb != 4:

@@ -692,8 +692,6 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte, i_addr,
                              and cur_search >= di - CWINDOW \
                              and di < isize - 3:
 
-                        """
-                        """
                         if FAST:
                             found = 0
                             fmatch = 0

@@ -14,6 +14,8 @@ Usage should be clear from the test bench in `test_deflate.py`.
 
     CWINDOW = 32    # Search window for compression
 
+## Compression efficiency
+
 One can use a sliding window to reduce the size of the input buffer and the LUT-usage.
 
 The optimal value is 4 * CWINDOW (128 bytes), the first decompression in the UnitTest in `test_deflate.py`
@@ -31,6 +33,12 @@ to activate this option.
 Another strategy for data sets with just a small set of used byte values would be
 to use a dedicated pre-computed Huffman tree. I could add this if there is interest, but it is probably
 better to use a more dense coding in your FPGA application data in the first place.
+
+## Compression speed
+
+To reduce LUT usage the default implementation matches each slot in the search window in a dedicated clock cycle.
+By setting `FAST` to `True` it will generate the logic the match the whole window in a single cycle.
+The effective speed will be around 1 input byte every two cycles.
 
 # FPGA validation
 
@@ -61,8 +69,27 @@ LUTRAM	|488
 FF	|3316
 BRAM	|4
 
+## FAST
+
+Resource|Estimation
+--------|----------
+LUT	|8246
+LUTRAM	|704
+FF	|2520
+BRAM	|4
+
+## FAST and MATCH10
+
+Resource|Estimation
+--------|----------
+LUT	|12068
+LUTRAM	|488
+FF	|3606
+BRAM	|4
+
+
 # Future Improvements (when there is interest)
 
 * ~~Reduce LUT usage~~
 * Improve speed from current 80Mhz to 100Mhz
-* Improve compression performance
+* ~~Improve compression performance~~

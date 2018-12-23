@@ -10,7 +10,7 @@ from myhdl import delay, now, Signal, intbv, ResetSignal, Simulation, \
 from deflate import IDLE, WRITE, READ, STARTC, STARTD, LBSIZE, IBSIZE, \
                     CWINDOW, COMPRESS
 
-MAXW = 2 * CWINDOW
+MAXW = CWINDOW
 
 COSIMULATION = True
 COSIMULATION = False

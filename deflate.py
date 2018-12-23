@@ -17,14 +17,14 @@ from myhdl import always, block, Signal, intbv, Error, ResetSignal, \
 
 IDLE, RESET, WRITE, READ, STARTC, STARTD = range(6)
 
+COMPRESS = True
+MATCH10 = False
+FAST = True
+
 CWINDOW = 32    # Search window for compression
 
 OBSIZE = 8192   # Size of output buffer (BRAM)
 IBSIZE = 4 * CWINDOW  # 2048   # Size of input buffer (LUT-RAM)
-
-COMPRESS = True
-MATCH10 = False
-FAST = False
 
 if OBSIZE > IBSIZE:
     LBSIZE = log2(OBSIZE)
@@ -154,6 +154,9 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte, i_addr,
     b41 = ConcatSignal(b4, b3, b2, b1)
     b41._markUsed()
 
+    b14 = ConcatSignal(b1, b2, b3, b4)
+    b14._markUsed()
+
     nb = Signal(intbv()[3:])
 
     filled = Signal(bool())
@@ -178,6 +181,21 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte, i_addr,
         orbyte.next = oram[oraddr]
         # rleaf.next = leaves[lraddr]
 
+    @block
+    def matcher3(o_m, mi):
+        @always_comb
+        def logic():
+            o_m.next = ((cwindow >> mi) & 0xFFFFFF) == (b14 >> 8)
+        return logic
+
+    if FAST:
+        smatch = [Signal(bool()) for _ in range(CWINDOW)]
+        cwindow = Signal(modbv()[8 * CWINDOW:])
+        matchers = [matcher3(smatch[mi], mi) for mi in range(CWINDOW)]
+    else:
+        smatch = [Signal(bool())]
+
+    """
     @always(clk.posedge)
     def fill_buf():
         if not reset:
@@ -219,42 +237,52 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte, i_addr,
                 delta = di - old_di
                 if delta == 1:
                     # print("delta == 1")
+                    cwindow.next = (cwindow << 8) | b1
                     b1.next = b2
                     b2.next = b3
                     b3.next = b4
                     b4.next = iram[di+3 & IBS]
                     # nb.next = 4
                 elif delta == 2:
+                    print("delta == 2")
+                    cwindow.next = (cwindow << 16) | (b14 >> 16)
                     b1.next = b3
                     b2.next = b4
                     b3.next = iram[di+2 & IBS]
                     nb.next = 3
                 elif delta == 3:
+                    print("delta == 2")
+                    cwindow.next = (cwindow << 24) | (b14 >> 8)
                     b1.next = b4
                     b2.next = iram[di+1 & IBS]
                     nb.next = 2
                 elif delta == 4:
+                    raise Error("delta 4")
+                    cwindow.next = (cwindow << 32) | (b14)
                     b1.next = iram[di & IBS]
                     nb.next = 1
                 else:
                     pass
             elif not filled or nb == 0:
-                # print("nb.next = 1")
+                print("nb = 0")
                 b1.next = iram[di & IBS]
                 nb.next = 1
             elif not filled or nb == 1:
+                print("nb = 1")
                 b2.next = iram[di+1 & IBS]
                 nb.next = 2
             elif not filled or nb == 2:
+                print("nb = 2")
+                # raise Error("nb == 2")
                 b3.next = iram[di+2 & IBS]
                 nb.next = 3
             elif not filled or nb == 3:
+                print("nb = 3")
                 b4.next = iram[di+3 & IBS]
                 nb.next = 4
             else:
                 pass
             old_di.next = di
-    """
 
     def get4(boffset, width):
         if nb != 4:
@@ -340,21 +368,6 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte, i_addr,
 
     def get_code(aleaf):
         return (aleaf >> BITBITS)  # & ((1 << CODEBITS) - 1)
-
-    @block
-    def matcher3(o_m, mi):
-        @always_comb
-        def logic():
-            o_m.next = ((iram[di-1-mi & IBS] == iram[di & IBS])
-                        and (iram[di-mi & IBS] == iram[di+1 & IBS])
-                        and (iram[di+1-mi & IBS] == iram[di+2 & IBS]))
-        return logic
-
-    if FAST:
-        smatch = [Signal(bool()) for _ in range(CWINDOW)]
-        matchers = [matcher3(smatch[mi], mi) for mi in range(CWINDOW)]
-    else:
-        smatch = [Signal(bool())]
 
     @always(clk.posedge)
     def io_logic():
@@ -621,15 +634,19 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte, i_addr,
                              and cur_search >= di - CWINDOW \
                              and di < isize - 3:
 
+                        """
+                        """
                         if FAST:
-                            fmatch = CWINDOW
+                            found = 0
+                            fmatch = 0
                             for si in range(CWINDOW):
                                 # print("test", di, si, di - si - 1)
-                                if di - si - 1 >= 0 and smatch[si]:
+                                if smatch[si]:
                                     # print("fmatch", si)
                                     fmatch = si
+                                    found = 1
                                     break
-                            if fmatch == CWINDOW:
+                            if not found or di - fmatch - 1 < 0:
                                 cur_search.next = -1
                                 # print("NO FSEARCH")
                             else:

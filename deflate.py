@@ -18,8 +18,8 @@ from myhdl import always, block, Signal, intbv, Error, ResetSignal, \
 IDLE, RESET, WRITE, READ, STARTC, STARTD = range(6)
 
 COMPRESS = True
-MATCH10 = True
 MATCH10 = False
+MATCH10 = True
 
 FAST = False
 FAST = True
@@ -156,12 +156,29 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte, i_addr,
     b2 = Signal(intbv()[8:])
     b3 = Signal(intbv()[8:])
     b4 = Signal(intbv()[8:])
+    b5 = Signal(intbv()[8:])
 
     b41 = ConcatSignal(b4, b3, b2, b1)
     b41._markUsed()
 
     b14 = ConcatSignal(b1, b2, b3, b4)
     b14._markUsed()
+
+    if MATCH10:
+        b6 = Signal(intbv()[8:])
+        b7 = Signal(intbv()[8:])
+        b8 = Signal(intbv()[8:])
+        b9 = Signal(intbv()[8:])
+        b10 = Signal(intbv()[8:])
+        b110 = ConcatSignal(b1, b2, b3, b4, b5, b6, b7, b8, b9, b10)
+        b110._markUsed()
+    else:
+        b6 = Signal(bool())
+        b7 = Signal(bool())
+        b8 = Signal(bool())
+        b9 = Signal(bool())
+        b10 = Signal(bool())
+        b110 = Signal(bool())
 
     nb = Signal(intbv()[3:])
 
@@ -170,8 +187,7 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte, i_addr,
     ob1 = Signal(intbv()[8:])
     copy1 = Signal(intbv()[8:])
     copy2 = Signal(intbv()[8:])
-    flush = Signal(bool(0))
-    wtick = Signal(bool(0))
+    flush = Signal(bool())
 
     adler1 = Signal(intbv()[16:])
     adler2 = Signal(intbv()[16:])
@@ -230,7 +246,12 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte, i_addr,
                     if shift != 0:
                         print("shift", shift, cwindow, b1, b2, b3, b4)
                     """
-                    cwindow.next = (cwindow << shift) | (b14 >> (32 - shift))
+                    if shift <= 32:
+                        cwindow.next = (cwindow << shift) | (b14 >> (32 - shift))
+                    elif shift == 40:
+                        cwindow.next = (cwindow << shift) | (b14 << 8) | b5
+                    elif MATCH10:
+                        cwindow.next = (cwindow << shift) | (b110 >> (80 - shift))
 
                 if old_di == di:
                     nb.next = 4
@@ -242,6 +263,13 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte, i_addr,
                 b2.next = iram[di+1 & IBS]
                 b3.next = iram[di+2 & IBS]
                 b4.next = iram[di+3 & IBS]
+                b5.next = iram[di+4 & IBS]
+                if MATCH10:
+                    b6.next = iram[di+5 & IBS]
+                    b7.next = iram[di+6 & IBS]
+                    b8.next = iram[di+7 & IBS]
+                    b9.next = iram[di+8 & IBS]
+                    b10.next = iram[di+9 & IBS]
     """
     @always(clk.posedge)
     def fill_buf():
@@ -682,39 +710,37 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte, i_addr,
                             else:
                                 distance = fmatch + 1
                                 # print("FSEARCH", distance)
-                                fmatch = di - fmatch + 3
+                                fmatch = di - fmatch + 2
                                 # Length is 3 code
                                 lencode = 257
                                 match = 3
 
-                                if False and di < isize - 4 and \
+                                if di < isize - 4 and \
                                         iram[fmatch & IBS] == b4:
-                                        #(cwindow >> (8 * (fmatch-1))) & 0xFF == b4:
                                     lencode = 258
                                     match = 4
-                                    if False and di < isize - 5 and fmatch > 1 and \
-                                            (cwindow >> (8 * (fmatch-2))) & 0xFF == iram[di + 4 & IBS]:
-                                            # iram[fmatch & IBS] == iram[di + 4 & IBS]:
+                                    if di < isize - 5 and \
+                                            iram[fmatch+1 & IBS] == b5:
                                         lencode = 259
                                         match = 5
                                         if MATCH10 and di < isize - 6 and \
-                                                iram[fmatch & IBS] == iram[di + 5 & IBS]:
+                                                iram[fmatch+2 & IBS] == b6:
                                             lencode = 260
                                             match = 6
                                             if di < isize - 7 and \
-                                                    iram[fmatch & IBS] == iram[di + 6 & IBS]:
+                                                    iram[fmatch+3 & IBS] == b7:
                                                 lencode = 261
                                                 match = 7
                                                 if di < isize - 8 and \
-                                                        iram[fmatch & IBS] == iram[di + 7 & IBS]:
+                                                        iram[fmatch+4 & IBS] == b8:
                                                     lencode = 262
                                                     match = 8
                                                     if di < isize - 9 and \
-                                                            iram[fmatch & IBS] == iram[di + 8 & IBS]:
+                                                            iram[fmatch+5 & IBS] == b9:
                                                         lencode = 263
                                                         match = 9
                                                         if di < isize - 10 and \
-                                                                iram[fmatch & IBS] == iram[di + 9 & IBS]:
+                                                                iram[fmatch+6 & IBS] == b10:
                                                             lencode = 264
                                                             match = 10
 

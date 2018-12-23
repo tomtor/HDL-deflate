@@ -620,7 +620,7 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte, i_addr,
                         print(cur_cstatic, isize)
                         raise Error("???")
                 else:
-                    bdata = iram[di]
+                    bdata = iram[di & IBS]
                     # Fix this when > 1 byte output:
                     # print("cs1", bdata)
                     adler1_next = (adler1 + bdata) % 65521
@@ -760,7 +760,7 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte, i_addr,
                                 length.next = match
                                 state.next = d_state.DISTANCE
 
-                        elif iram[cur_search & IBS] == b1 and \
+                        elif not FAST and iram[cur_search & IBS] == b1 and \
                                 iram[cur_search+1 & IBS] == b2 and \
                                 iram[cur_search+2 & IBS] == b3:
                             # Length is 3 code
@@ -772,27 +772,27 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte, i_addr,
                                 lencode = 258
                                 match = 4
                                 if di < isize - 5 and \
-                                        iram[cur_search+4 & IBS] == iram[di + 4 & IBS]:
+                                        iram[cur_search+4 & IBS] == b5:
                                     lencode = 259
                                     match = 5
                                     if MATCH10 and di < isize - 6 and \
-                                            iram[cur_search+5 & IBS] == iram[di + 5 & IBS]:
+                                            iram[cur_search+5 & IBS] == b6:
                                         lencode = 260
                                         match = 6
                                         if di < isize - 7 and \
-                                                iram[cur_search+6 & IBS] == iram[di + 6 & IBS]:
+                                                iram[cur_search+6 & IBS] == b7:
                                             lencode = 261
                                             match = 7
                                             if di < isize - 8 and \
-                                                    iram[cur_search+7 & IBS] == iram[di + 7 & IBS]:
+                                                    iram[cur_search+7 & IBS] == b8:
                                                 lencode = 262
                                                 match = 8
                                                 if di < isize - 9 and \
-                                                        iram[cur_search+8 & IBS] == iram[di + 8 & IBS]:
+                                                        iram[cur_search+8 & IBS] == b9:
                                                     lencode = 263
                                                     match = 9
                                                     if di < isize - 10 and \
-                                                            iram[cur_search+9 & IBS] == iram[di + 9 & IBS]:
+                                                            iram[cur_search+9 & IBS] == b10:
                                                         lencode = 264
                                                         match = 10
 
@@ -817,7 +817,7 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte, i_addr,
                             cur_search.next = cur_search - 1
                     else:
                         # print("NO MATCH")
-                        bdata = iram[di]
+                        bdata = b1  # iram[di]
                         # adv(8)
                         di.next = di + 1
                         outlen = codeLength[bdata]

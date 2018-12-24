@@ -18,11 +18,11 @@ from myhdl import always, block, Signal, intbv, Error, ResetSignal, \
 IDLE, RESET, WRITE, READ, STARTC, STARTD = range(6)
 
 COMPRESS = True
-MATCH10 = False
 MATCH10 = True
+MATCH10 = False
 
-FAST = False
 FAST = True
+FAST = False
 
 CWINDOW = 32    # Search window for compression
 
@@ -41,7 +41,7 @@ d_state = enum('IDLE', 'HEADER', 'BL', 'READBL', 'REPEAT', 'DISTTREE', 'INIT3',
                'HF1', 'HF1INIT', 'HF2', 'HF3', 'HF4', 'HF4_2', 'HF4_3',
                'STATIC', 'D_NEXT', 'D_NEXT_2',
                'D_INFLATE', 'SPREAD', 'NEXT', 'INFLATE', 'COPY', 'CSTATIC',
-               'SEARCH', 'DISTANCE', 'CHECKSUM') # , encoding='one_hot')
+               'SEARCH', 'SEARCHF', 'DISTANCE', 'CHECKSUM') # , encoding='one_hot')
 
 CodeLengthOrder = (16, 17, 18, 0, 8, 7, 9, 6, 10, 5, 11, 4, 12, 3, 13, 2, 14,
                    1, 15)
@@ -566,6 +566,16 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte, i_addr,
                     pass
                 elif flush:
                     do_flush()
+                elif cur_i == 64:
+                    lencode = length + 254
+                    # print("fast:", distance, di, isize, match)
+                    outlen = codeLength[lencode]
+                    outbits = code_bits[lencode]
+                    # print("BITS:", outlen, outbits)
+                    oaddr.next = do
+                    obyte.next = put(outbits, outlen)
+                    put_adv(outbits, outlen)
+                    cur_i.next = 0
                 else:
                     # print("DISTANCE", di, do, cur_i, cur_dist)
                     nextdist = CopyDistance[cur_i+1]
@@ -605,6 +615,56 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte, i_addr,
                 else:
                     state.next = d_state.CSTATIC
 
+            elif state == d_state.SEARCHF:
+
+                if FAST:
+                    lfmatch = length
+                    distance = lfmatch + 1
+                    # print("FSEARCH", distance)
+                    fmatch2 = di - lfmatch + 2
+                    # Length is 3 code
+                    lencode = 257
+                    match = 3
+
+                    if di < isize - 4 and \
+                            iram[fmatch2 & IBS] == b4:
+                        lencode = 258
+                        match = 4
+                        if di < isize - 5 and \
+                                iram[fmatch2+1 & IBS] == b5:
+                            lencode = 259
+                            match = 5
+                            if MATCH10 and di < isize - 6 and \
+                                    iram[fmatch2+2 & IBS] == b6:
+                                lencode = 260
+                                match = 6
+                                if di < isize - 7 and \
+                                        iram[fmatch2+3 & IBS] == b7:
+                                    lencode = 261
+                                    match = 7
+                                    if di < isize - 8 and \
+                                            iram[fmatch2+4 & IBS] == b8:
+                                        lencode = 262
+                                        match = 8
+                                        if di < isize - 9 and \
+                                                iram[fmatch2+5 & IBS] == b9:
+                                            lencode = 263
+                                            match = 9
+                                            if di < isize - 10 and \
+                                                    iram[fmatch2+6 & IBS] == b10:
+                                                lencode = 264
+                                                match = 10
+
+                    # distance = di - cur_search
+                    # print("distance", distance)
+                    cur_dist.next = distance
+                    cur_i.next = 64
+                    # adv(match * 8)
+                    di.next = di + match
+                    cur_cstatic.next = cur_cstatic + match - 1
+                    length.next = match
+                    state.next = d_state.DISTANCE
+
             elif state == d_state.SEARCH:
 
                 if not COMPRESS:
@@ -632,59 +692,8 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte, i_addr,
                                 cur_search.next = -1
                                 # print("NO FSEARCH")
                             else:
-                                distance = fmatch + 1
-                                # print("FSEARCH", distance)
-                                fmatch = di - fmatch + 2
-                                # Length is 3 code
-                                lencode = 257
-                                match = 3
-
-                                if di < isize - 4 and \
-                                        iram[fmatch & IBS] == b4:
-                                    lencode = 258
-                                    match = 4
-                                    if di < isize - 5 and \
-                                            iram[fmatch+1 & IBS] == b5:
-                                        lencode = 259
-                                        match = 5
-                                        if MATCH10 and di < isize - 6 and \
-                                                iram[fmatch+2 & IBS] == b6:
-                                            lencode = 260
-                                            match = 6
-                                            if di < isize - 7 and \
-                                                    iram[fmatch+3 & IBS] == b7:
-                                                lencode = 261
-                                                match = 7
-                                                if di < isize - 8 and \
-                                                        iram[fmatch+4 & IBS] == b8:
-                                                    lencode = 262
-                                                    match = 8
-                                                    if di < isize - 9 and \
-                                                            iram[fmatch+5 & IBS] == b9:
-                                                        lencode = 263
-                                                        match = 9
-                                                        if di < isize - 10 and \
-                                                                iram[fmatch+6 & IBS] == b10:
-                                                            lencode = 264
-                                                            match = 10
-
-                                print("fast:", distance, di, isize, match)
-                                outlen = codeLength[lencode]
-                                outbits = code_bits[lencode]
-                                # print("BITS:", outlen, outbits)
-                                oaddr.next = do
-                                obyte.next = put(outbits, outlen)
-                                put_adv(outbits, outlen)
-
-                                # distance = di - cur_search
-                                # print("distance", distance)
-                                cur_dist.next = distance
-                                cur_i.next = 0
-                                # adv(match * 8)
-                                di.next = di + match
-                                cur_cstatic.next = cur_cstatic + match - 1
-                                length.next = match
-                                state.next = d_state.DISTANCE
+                                length.next = fmatch
+                                state.next = d_state.SEARCHF
 
                         elif not FAST and iram[cur_search & IBS] == b1 and \
                                 iram[cur_search+1 & IBS] == b2 and \
@@ -722,18 +731,10 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte, i_addr,
                                                         lencode = 264
                                                         match = 10
 
-                            print("found:", cur_search, di, isize, match)
-                            outlen = codeLength[lencode]
-                            outbits = code_bits[lencode]
-                            # print("BITS:", outlen, outbits)
-                            oaddr.next = do
-                            obyte.next = put(outbits, outlen)
-                            put_adv(outbits, outlen)
-
                             distance = di - cur_search
                             # print("distance", distance)
                             cur_dist.next = distance
-                            cur_i.next = 0
+                            cur_i.next = 64  # 0
                             # adv(match * 8)
                             di.next = di + match
                             cur_cstatic.next = cur_cstatic + match - 1

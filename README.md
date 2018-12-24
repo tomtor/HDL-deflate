@@ -82,9 +82,9 @@ BRAM	|4
 
 Resource|Estimation
 --------|----------
-LUT	|12068
+LUT	|12480
 LUTRAM	|488
-FF	|3606
+FF	|3607
 BRAM	|4
 
 

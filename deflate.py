@@ -73,12 +73,12 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
     iram = [Signal(intbv()[8:]) for _ in range(IBSIZE)]
     oram = [Signal(intbv()[8:]) for _ in range(OBSIZE)]
 
-    oaddr = Signal(intbv()[LBSIZE:])
+    oaddr = Signal(modbv()[LBSIZE:])
     oraddr = Signal(intbv()[LBSIZE:])
     obyte = Signal(intbv()[8:])
     orbyte = Signal(intbv()[8:])
 
-    iraddr = Signal(intbv()[LIBSIZE:])
+    iraddr = Signal(modbv()[LIBSIZE:])
 
     isize = Signal(intbv()[LMAX:])
     state = Signal(d_state.IDLE)
@@ -134,7 +134,7 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
     lastToken = Signal(intbv()[15:])
     howOften = Signal(intbv()[9:])
 
-    cur_i = Signal(intbv()[LBSIZE:])
+    cur_i = Signal(intbv()[LMAX:])
     spread_i = Signal(intbv()[9:])
     cur_HF1 = Signal(intbv()[10:])
     cur_static = Signal(intbv()[9:])
@@ -1293,9 +1293,9 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
 
 if __name__ == "__main__":
     d = deflate(Signal(intbv()[3:]), Signal(bool(0)),
-                Signal(intbv()[8:]), Signal(intbv()[LBSIZE:]),
-                Signal(intbv()[LBSIZE:]),
+                Signal(intbv()[8:]), Signal(intbv()[LMAX:]),
+                Signal(intbv()[LMAX:]),
                 Signal(intbv()[8:]),
-                Signal(intbv()[LBSIZE:]), Signal(intbv()[LBSIZE:]),
+                Signal(modbv()[LIBSIZE:]), Signal(modbv()[LBSIZE:]),
                 Signal(bool(0)), ResetSignal(1, 0, True))
     d.convert()

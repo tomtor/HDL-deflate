@@ -8,7 +8,7 @@ from myhdl import delay, now, Signal, intbv, ResetSignal, Simulation, \
                   always, always_seq, always_comb, enum, Error
 
 from deflate import IDLE, WRITE, READ, STARTC, STARTD, LBSIZE, IBSIZE, \
-                    CWINDOW, COMPRESS, OBSIZE, LMAX
+                    CWINDOW, COMPRESS, OBSIZE, LMAX, LIBSIZE
 
 MAXW = 2 * CWINDOW
 
@@ -269,7 +269,7 @@ class TestDeflate(unittest.TestCase):
             print("WRITE")
             i = 0
             ri = 0
-            slen = 5000
+            slen = 500
             sresult = []
             while True:
                 i_mode.next = WRITE
@@ -277,7 +277,7 @@ class TestDeflate(unittest.TestCase):
                 i_data.next = i & 0x1
                 if i < slen:
                     # print("write", i)
-                    if o_iprogress > i % OBSIZE - MAXW:
+                    if o_iprogress > i - MAXW:
                         i = i + 1
                     else:
                         print("Wait for space", i)
@@ -318,8 +318,7 @@ class TestDeflate(unittest.TestCase):
 
 
         for loop in range(1):
-            # for mode in range(5):
-            for mode in range(2,3):
+            for mode in range(5):
                 self.runTests(test_decompress)
 
     def runTests(self, test):
@@ -332,7 +331,7 @@ class TestDeflate(unittest.TestCase):
         o_byte = Signal(intbv()[8:])
         o_iprogress = Signal(intbv()[LMAX:])
         o_oprogress = Signal(intbv()[LMAX:])
-        i_waddr = Signal(modbv()[LBSIZE:])
+        i_waddr = Signal(modbv()[LMAX:])
         i_raddr = Signal(modbv()[LBSIZE:])
 
         clk = Signal(bool(0))
@@ -367,8 +366,8 @@ def test_deflate_bench(i_clk, o_led, led0_g, led1_b, led2_r):
     o_iprogress = Signal(intbv()[LMAX:])
     o_oprogress = Signal(intbv()[LMAX:])
     resultlen = Signal(intbv()[LMAX:])
-    i_waddr = Signal(intbv()[LBSIZE:])
-    i_raddr = Signal(intbv()[LBSIZE:])
+    i_waddr = Signal(modbv()[LMAX:])
+    i_raddr = Signal(modbv()[LBSIZE:])
 
     reset = ResetSignal(1, 0, True)
 

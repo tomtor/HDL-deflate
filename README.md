@@ -36,7 +36,7 @@ better to use a more dense coding in your FPGA application data in the first pla
 
 ## Compression speed
 
-To reduce LUT usage the default implementation matches each slot in the search window in a dedicated clock cycle.
+To reduce LUT usage the original implementation matched each slot in the search window in a dedicated clock cycle.
 By setting `FAST` to `True` it will generate the logic to match the whole window in a single cycle.
 The effective speed will be around 1 input byte every two cycles.
 

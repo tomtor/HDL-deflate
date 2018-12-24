@@ -18,8 +18,8 @@ from myhdl import always, block, Signal, intbv, Error, ResetSignal, \
 IDLE, RESET, WRITE, READ, STARTC, STARTD = range(6)
 
 COMPRESS = True
-MATCH10 = True
 MATCH10 = False
+MATCH10 = True
 
 FAST = False
 FAST = True

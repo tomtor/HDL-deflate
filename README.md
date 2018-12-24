@@ -87,9 +87,13 @@ LUTRAM	|488
 FF	|3607
 BRAM	|4
 
+## Speed
+
+The Vivado timing report fails at 100Mhz, but the test bench runs fine on my Arty at 100Mhz.
+`MATCH10` causes the most delays.
 
 # Future Improvements (when there is interest)
 
 * ~~Reduce LUT usage~~
-* Improve speed from current 80Mhz to 100Mhz
+* ~~Improve speed from current 80Mhz to 100Mhz~~
 * ~~Improve compression performance~~

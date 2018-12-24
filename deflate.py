@@ -21,8 +21,8 @@ COMPRESS = True
 MATCH10 = True
 MATCH10 = False
 
-FAST = True
 FAST = False
+FAST = True
 
 CWINDOW = 32    # Search window for compression
 

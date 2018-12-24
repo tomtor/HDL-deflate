@@ -8,7 +8,7 @@ from myhdl import delay, now, Signal, intbv, ResetSignal, Simulation, \
                   always, always_seq, always_comb, enum, Error
 
 from deflate import IDLE, WRITE, READ, STARTC, STARTD, LBSIZE, IBSIZE, \
-                    CWINDOW, COMPRESS
+                    CWINDOW, COMPRESS, OBSIZE, LMAX
 
 MAXW = 2 * CWINDOW
 
@@ -19,7 +19,7 @@ if not COSIMULATION:
     from deflate import deflate
 else:
     def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress,
-                o_byte, i_addr, clk, reset):
+                o_byte, i_waddr, i_raddr, clk, reset):
         print("Cosimulation")
         cmd = "iverilog -o deflate " + \
               "deflate.v " + \
@@ -29,7 +29,7 @@ else:
                             i_mode=i_mode, o_done=o_done,
                             i_data=i_data, o_iprogress=o_iprogress,
                             o_oprogress=o_oprogress,
-                            o_byte=o_byte, i_addr=i_addr,
+                            o_byte=o_byte, i_waddr=i_waddr, i_raddr=i_raddr,
                             clk=clk, reset=reset)
 
 
@@ -69,7 +69,7 @@ class TestDeflate(unittest.TestCase):
     def testMain(self):
 
         def test_decompress(i_mode, o_done, i_data, o_iprogress,
-                            o_oprogress, o_byte, i_addr, clk, reset):
+                            o_oprogress, o_byte, i_waddr, i_raddr, clk, reset):
 
             def tick():
                 clk.next = not clk
@@ -103,7 +103,7 @@ class TestDeflate(unittest.TestCase):
                 if o_iprogress > i - MAXW:
                     # print("write", i)
                     i_data.next = zl_data[i]
-                    i_addr.next = i
+                    i_waddr.next = i
                     i = i + 1
                 else:
                     # print("Wait for space")
@@ -121,7 +121,7 @@ class TestDeflate(unittest.TestCase):
             i_mode.next = WRITE
             for i in range(len(zl_data)):
                 i_data.next = zl_data[i]
-                i_addr.next = i
+                i_waddr.next = i
                 tick()
                 yield delay(5)
                 tick()
@@ -150,7 +150,7 @@ class TestDeflate(unittest.TestCase):
             i_mode.next = READ
             d_data = []
             for i in range(last):
-                i_addr.next = i
+                i_raddr.next = i
                 tick()
                 yield delay(5)
                 tick()
@@ -168,7 +168,7 @@ class TestDeflate(unittest.TestCase):
             i_mode.next = WRITE
             for i in range(len(b_data)):
                 i_data.next = b_data[i]
-                i_addr.next = i
+                i_waddr.next = i
                 tick()
                 yield delay(5)
                 tick()
@@ -197,7 +197,7 @@ class TestDeflate(unittest.TestCase):
             i_mode.next = READ
             c_data = []
             for i in range(last):
-                i_addr.next = i
+                i_raddr.next = i
                 tick()
                 yield delay(5)
                 tick()
@@ -216,7 +216,7 @@ class TestDeflate(unittest.TestCase):
             i_mode.next = WRITE
             for i in range(len(c_data)):
                 i_data.next = c_data[i]
-                i_addr.next = i
+                i_waddr.next = i
                 tick()
                 yield delay(5)
                 tick()
@@ -243,7 +243,7 @@ class TestDeflate(unittest.TestCase):
             i_mode.next = READ
             d_data = []
             for i in range(last):
-                i_addr.next = i
+                i_raddr.next = i
                 tick()
                 yield delay(5)
                 tick()
@@ -269,18 +269,18 @@ class TestDeflate(unittest.TestCase):
             print("WRITE")
             i = 0
             ri = 0
-            slen = 380
+            slen = 5000
             sresult = []
             while True:
                 i_mode.next = WRITE
-                i_addr.next = i
+                i_waddr.next = i
                 i_data.next = i & 0x1
                 if i < slen:
                     # print("write", i)
-                    if o_iprogress > i - MAXW:
+                    if o_iprogress > i % OBSIZE - MAXW:
                         i = i + 1
                     else:
-                        # print("Wait for space", i)
+                        print("Wait for space", i)
                         pass
                 else:
                     i_mode.next = IDLE
@@ -291,7 +291,7 @@ class TestDeflate(unittest.TestCase):
 
                 if ri < o_oprogress:
                     i_mode.next = READ
-                    i_addr.next = ri
+                    i_raddr.next = ri
                     tick()
                     yield delay(5)
                     tick()
@@ -330,18 +330,19 @@ class TestDeflate(unittest.TestCase):
 
         i_data = Signal(intbv()[8:])
         o_byte = Signal(intbv()[8:])
-        o_iprogress = Signal(intbv()[LBSIZE:])
-        o_oprogress = Signal(intbv()[LBSIZE:])
-        i_addr = Signal(intbv()[LBSIZE:])
+        o_iprogress = Signal(intbv()[LMAX:])
+        o_oprogress = Signal(intbv()[LMAX:])
+        i_waddr = Signal(modbv()[LBSIZE:])
+        i_raddr = Signal(modbv()[LBSIZE:])
 
         clk = Signal(bool(0))
         reset = ResetSignal(1, 0, True)
 
         dut = deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress,
-                      o_byte, i_addr, clk, reset)
+                      o_byte, i_waddr, i_raddr, clk, reset)
 
         check = test(i_mode, o_done, i_data, o_iprogress, o_oprogress,
-                     o_byte, i_addr, clk, reset)
+                     o_byte, i_waddr, i_raddr, clk, reset)
         sim = Simulation(dut, check)
         # traceSignals(dut)
         sim.run(quiet=1)
@@ -363,15 +364,16 @@ def test_deflate_bench(i_clk, o_led, led0_g, led1_b, led2_r):
     i_data = Signal(intbv()[8:])
     o_byte = Signal(intbv()[8:])
     u_data = Signal(intbv()[8:])
-    o_iprogress = Signal(intbv()[LBSIZE:])
-    o_oprogress = Signal(intbv()[LBSIZE:])
-    resultlen = Signal(intbv()[LBSIZE:])
-    i_addr = Signal(intbv()[LBSIZE:])
+    o_iprogress = Signal(intbv()[LMAX:])
+    o_oprogress = Signal(intbv()[LMAX:])
+    resultlen = Signal(intbv()[LMAX:])
+    i_waddr = Signal(intbv()[LBSIZE:])
+    i_raddr = Signal(intbv()[LBSIZE:])
 
     reset = ResetSignal(1, 0, True)
 
     dut = deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress,
-                  o_byte, i_addr, i_clk, reset)
+                  o_byte, i_waddr, i_raddr, i_clk, reset)
 
     tb_state = enum('RESET', 'START', 'WRITE', 'DECOMPRESS', 'WAIT', 'VERIFY',
                     'PAUSE', 'CWRITE', 'COMPRESS', 'CWAIT', 'CRESULT',
@@ -446,7 +448,7 @@ def test_deflate_bench(i_clk, o_led, led0_g, led1_b, led2_r):
                 led2_r.next = not led2_r
                 i_mode.next = WRITE
                 i_data.next = CDATA[tbi]
-                i_addr.next = tbi
+                i_waddr.next = tbi
                 tbi.next = tbi + 1
             else:
                 i_mode.next = IDLE
@@ -462,20 +464,12 @@ def test_deflate_bench(i_clk, o_led, led0_g, led1_b, led2_r):
             i_mode.next = IDLE
             if i_mode == IDLE and o_done:
                 print("result len", o_oprogress)
-                if o_oprogress == 0x4F:
-                    tstate.next = tb_state.HALT
                 resultlen.next = o_oprogress
                 tbi.next = 0
-                i_addr.next = 0
+                i_raddr.next = 0
                 i_mode.next = READ
                 wtick.next = True
                 tstate.next = tb_state.VERIFY
-                """
-                if o_oprogress == 0x4F:
-                    tstate.next = tb_state.HALT
-                else:
-                    tstate.next = tb_state.FAIL
-                """
 
         elif tstate == tb_state.VERIFY:
             # print("VERIFY", o_data)
@@ -503,7 +497,7 @@ def test_deflate_bench(i_clk, o_led, led0_g, led1_b, led2_r):
                 else:
                     pass
                     # print(tbi, o_data)
-                i_addr.next = tbi + 1
+                i_raddr.next = tbi + 1
                 tbi.next = tbi + 1
                 wtick.next = True
             else:
@@ -544,7 +538,7 @@ def test_deflate_bench(i_clk, o_led, led0_g, led1_b, led2_r):
                 led1_b.next = not led1_b
                 i_mode.next = WRITE
                 i_data.next = UDATA[tbi]
-                i_addr.next = tbi
+                i_waddr.next = tbi
                 tbi.next = tbi + 1
             else:
                 print("wrote bytes to compress", tbi)
@@ -565,7 +559,7 @@ def test_deflate_bench(i_clk, o_led, led0_g, led1_b, led2_r):
                 print("result len", o_oprogress)
                 resultlen.next = o_oprogress
                 tbi.next = 0
-                i_addr.next = 0
+                i_raddr.next = 0
                 i_mode.next = READ
                 tstate.next = tb_state.CRESULT
                 wtick.next = True
@@ -579,13 +573,13 @@ def test_deflate_bench(i_clk, o_led, led0_g, led1_b, led2_r):
                 if tbi > 0:
                     i_mode.next = WRITE
                     i_data.next = copy
-                    i_addr.next = tbi - 1
+                    i_waddr.next = tbi - 1
                 wtick.next = False
                 tbi.next = tbi + 1
             elif tbi < resultlen:
                 i_mode.next = READ
                 led1_b.next = not led1_b
-                i_addr.next = tbi
+                i_raddr.next = tbi
                 copy.next = o_byte
                 wtick.next = True
             else:
@@ -606,7 +600,7 @@ def test_deflate_bench(i_clk, o_led, led0_g, led1_b, led2_r):
             if i_mode == IDLE and o_done:
                 print("DONE DECOMPRESS VERIFY", o_oprogress)
                 tbi.next = 0
-                i_addr.next = 0
+                i_raddr.next = 0
                 i_mode.next = READ
                 wtick.next = True
                 tstate.next = tb_state.CVERIFY
@@ -628,7 +622,7 @@ def test_deflate_bench(i_clk, o_led, led0_g, led1_b, led2_r):
                     raise Error("bad result")
                     tstate.next = tb_state.FAIL
                 tbi.next = tbi + 1
-                i_addr.next = tbi + 1
+                i_raddr.next = tbi + 1
                 wtick.next = True
             else:
                 print(len(UDATA))

@@ -28,6 +28,7 @@ CWINDOW = 32    # Search window for compression
 
 OBSIZE = 8192   # Size of output buffer (BRAM)
 IBSIZE = 4 * CWINDOW  # 2048   # Size of input buffer (LUT-RAM)
+LMAX = 20       # Size of progress and I/O counters
 
 if OBSIZE > IBSIZE:
     LBSIZE = int(log2(OBSIZE))
@@ -60,8 +61,8 @@ ExtraDistanceBits = (0, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13)
 
 
 @block
-def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte, i_addr,
-            clk, reset):
+def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
+            i_waddr, i_raddr, clk, reset):
 
     """ Deflate (de)compress
 
@@ -79,7 +80,7 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte, i_addr,
 
     iraddr = Signal(intbv()[LIBSIZE:])
 
-    isize = Signal(intbv()[LBSIZE:])
+    isize = Signal(intbv()[LMAX:])
     state = Signal(d_state.IDLE)
     method = Signal(intbv()[3:])
     final = Signal(bool())
@@ -137,9 +138,9 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte, i_addr,
     spread_i = Signal(intbv()[9:])
     cur_HF1 = Signal(intbv()[10:])
     cur_static = Signal(intbv()[9:])
-    cur_cstatic = Signal(intbv()[LBSIZE:])
+    cur_cstatic = Signal(intbv()[LMAX:])
     # cur_search = Signal(intbv(min=-CWINDOW,max=IBSIZE))
-    cur_search = Signal(intbv(min=-1,max=OBSIZE))
+    cur_search = Signal(intbv(min=-1,max=1<<LMAX))
     cur_dist = Signal(intbv(min=-CWINDOW,max=IBSIZE))
     # cur_next = Signal(intbv()[5:])
     cur_next = Signal(bool())
@@ -147,10 +148,10 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte, i_addr,
     length = Signal(intbv()[LBSIZE:])
     offset = Signal(intbv()[LBSIZE:])
 
-    di = Signal(intbv()[LBSIZE:])
-    old_di = Signal(intbv()[LBSIZE:])
+    di = Signal(modbv()[LMAX:])
+    old_di = Signal(intbv()[LMAX:])
     dio = Signal(intbv()[3:])
-    do = Signal(intbv()[LBSIZE:])
+    do = Signal(intbv()[LMAX:])
     doo = Signal(intbv()[3:])
 
     b1 = Signal(intbv()[8:])
@@ -359,14 +360,14 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte, i_addr,
         if i_mode == WRITE:
 
             # print("WRITE:", i_addr, i_data)
-            iram[i_addr & IBS].next = i_data
-            isize.next = i_addr
+            iram[i_waddr & IBS].next = i_data
+            isize.next = i_waddr
 
         elif i_mode == READ:
 
             # o_data.next = oram[i_addr]
             # oraddr.next = i_addr
-            o_byte.next = oram[i_addr]
+            o_byte.next = oram[i_raddr]
 
         else:
             pass
@@ -503,6 +504,7 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte, i_addr,
                     obyte.next = ob1
                     do_flush()
                 elif cur_cstatic >= isize - 10 and i_mode != IDLE:
+                    print("P", cur_cstatic, isize)
                     no_adv = 1
                 elif cur_cstatic - 3 > isize:
                     if cur_cstatic - 3 == isize + 1:
@@ -557,7 +559,7 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte, i_addr,
                     ladler1.next = adler1_next
                     # print("in: ", bdata, di, isize)
                     state.next = d_state.SEARCH
-                    cur_search.next = (di - 1) & IBS
+                    cur_search.next = di - 1  # & IBS
 
                 if not no_adv:
                     cur_cstatic.next = cur_cstatic + 1
@@ -676,6 +678,7 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte, i_addr,
                 elif nb < 4:
                     pass
                 else:
+                    # print("cs",  cur_search, di, di - CWINDOW)
                     if cur_search >= 0 \
                              and cur_search >= di - CWINDOW \
                              and di < isize - 3:
@@ -684,7 +687,7 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte, i_addr,
                             found = 0
                             fmatch = 0
                             for si in range(CWINDOW):
-                                print("test", di, si, di - si - 1)
+                                # print("test", di, si, di - si - 1)
                                 if smatch[si]:
                                     # print("fmatch", si)
                                     fmatch = si
@@ -1170,7 +1173,9 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte, i_addr,
                     elif nb < 4:  # nb <= 2 or (nb == 3 and dio > 1):
                         # print("EXTRA FETCH", nb, dio)
                         pass  # fetch more bytes
-                    elif di > isize:  # - 3:  # checksum is 4 bytes
+                    elif di >= isize - 4 and not i_mode == IDLE:
+                        pass  # fetch more bytes
+                    elif di > isize - 3:  # checksum is 4 bytes
                         state.next = d_state.IDLE
                         o_done.next = True
                         print("NO EOF ", di)
@@ -1290,6 +1295,7 @@ if __name__ == "__main__":
     d = deflate(Signal(intbv()[3:]), Signal(bool(0)),
                 Signal(intbv()[8:]), Signal(intbv()[LBSIZE:]),
                 Signal(intbv()[LBSIZE:]),
-                Signal(intbv()[8:]), Signal(intbv()[LBSIZE:]),
+                Signal(intbv()[8:]),
+                Signal(intbv()[LBSIZE:]), Signal(intbv()[LBSIZE:]),
                 Signal(bool(0)), ResetSignal(1, 0, True))
     d.convert()

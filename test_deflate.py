@@ -256,8 +256,70 @@ class TestDeflate(unittest.TestCase):
             self.assertEqual(b_data, d_data, "decompress after compress does NOT match")
             print(len(b_data), len(zl_data), len(c_data))
 
+            print("==========STREAMING COMPRESS TEST=========")
+
+            print("STARTC")
+            i_mode.next = STARTC
+            tick()
+            yield delay(5)
+            tick()
+            yield delay(5)
+            i_mode.next = IDLE
+
+            print("WRITE")
+            i = 0
+            ri = 0
+            slen = 380
+            sresult = []
+            while True:
+                i_mode.next = WRITE
+                i_addr.next = i
+                i_data.next = i & 0x1
+                if i < slen:
+                    # print("write", i)
+                    if o_iprogress > i - MAXW:
+                        i = i + 1
+                    else:
+                        # print("Wait for space", i)
+                        pass
+                else:
+                    i_mode.next = IDLE
+                tick()
+                yield delay(5)
+                tick()
+                yield delay(5)
+
+                if ri < o_oprogress:
+                    i_mode.next = READ
+                    i_addr.next = ri
+                    tick()
+                    yield delay(5)
+                    tick()
+                    yield delay(5)
+                    tick()
+                    yield delay(5)
+                    tick()
+                    yield delay(5)
+                    print("read", ri, o_oprogress, o_byte)
+                    sresult.append(bytes([o_byte]))
+                    ri = ri + 1
+
+                if o_done:
+                    print("DONE", o_oprogress, o_iprogress)
+                    if o_oprogress == ri:
+                        break;
+
+            i_mode.next = IDLE
+
+            print("IN/OUT", slen, len(sresult))
+            sresult = b''.join(sresult)
+            print("zlib test:", zlib.decompress(sresult)[:20])
+            print("DONE!")
+
+
         for loop in range(1):
-            for mode in range(5):
+            # for mode in range(5):
+            for mode in range(2,3):
                 self.runTests(test_decompress)
 
     def runTests(self, test):

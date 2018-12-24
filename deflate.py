@@ -138,7 +138,8 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte, i_addr,
     cur_HF1 = Signal(intbv()[10:])
     cur_static = Signal(intbv()[9:])
     cur_cstatic = Signal(intbv()[LBSIZE:])
-    cur_search = Signal(intbv(min=-CWINDOW,max=IBSIZE))
+    # cur_search = Signal(intbv(min=-CWINDOW,max=IBSIZE))
+    cur_search = Signal(intbv(min=-1,max=OBSIZE))
     cur_dist = Signal(intbv(min=-CWINDOW,max=IBSIZE))
     # cur_next = Signal(intbv()[5:])
     cur_next = Signal(bool())
@@ -501,6 +502,8 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte, i_addr,
                     oaddr.next = do
                     obyte.next = ob1
                     do_flush()
+                elif cur_cstatic >= isize - 10 and i_mode != IDLE:
+                    no_adv = 1
                 elif cur_cstatic - 3 > isize:
                     if cur_cstatic - 3 == isize + 1:
                         print("Put EOF", do)
@@ -547,15 +550,14 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte, i_addr,
                         raise Error("???")
                 else:
                     bdata = iram[di & IBS]
-                    # Fix this when > 1 byte output:
-                    # print("cs1", bdata)
+                    o_iprogress.next = di # & IBS
                     adler1_next = (adler1 + bdata) % 65521
                     adler1.next = adler1_next
                     adler2.next = (adler2 + ladler1) % 65521
                     ladler1.next = adler1_next
                     # print("in: ", bdata, di, isize)
                     state.next = d_state.SEARCH
-                    cur_search.next = di - 1
+                    cur_search.next = (di - 1) & IBS
 
                 if not no_adv:
                     cur_cstatic.next = cur_cstatic + 1
@@ -656,7 +658,7 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte, i_addr,
                                                 match = 10
 
                     # distance = di - cur_search
-                    # print("distance", distance)
+                    print("d/l", di, distance, match)
                     cur_dist.next = distance
                     cur_i.next = 64
                     # adv(match * 8)
@@ -682,9 +684,9 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte, i_addr,
                             found = 0
                             fmatch = 0
                             for si in range(CWINDOW):
-                                # print("test", di, si, di - si - 1)
+                                print("test", di, si, di - si - 1)
                                 if smatch[si]:
-                                    print("fmatch", si)
+                                    # print("fmatch", si)
                                     fmatch = si
                                     found = 1
                                     break

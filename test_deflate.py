@@ -33,7 +33,7 @@ else:
                             clk=clk, reset=reset)
 
 
-def test_data(m, tlen=100):
+def test_data(m, tlen=20, limit=False):
     print("MODE", m, tlen)
     if m == 0:
         str_data = " ".join(["Hello World! " + str(1) + " "
@@ -56,7 +56,8 @@ def test_data(m, tlen=100):
     else:
         raise Error("unknown test mode")
     # print(str_data)
-    b_data = b_data[:IBSIZE - 4 - 10]
+    if limit:
+        b_data = b_data[:IBSIZE - 4 - 10]
     zl_data = zlib.compress(b_data)
     print("From %d to %d bytes" % (len(b_data), len(zl_data)))
     print(zl_data)
@@ -87,177 +88,15 @@ class TestDeflate(unittest.TestCase):
             tick()
             yield delay(5)
 
-            print("STARTD")
-            i_mode.next = STARTD
-            tick()
-            yield delay(5)
-            tick()
-            yield delay(5)
-            i_mode.next = IDLE
-
-            print("WRITE")
-            i_mode.next = WRITE
-            i = 0
-            while i < len(zl_data):
-                if o_iprogress > i - MAXW:
-                    # print("write", i)
-                    i_data.next = zl_data[i]
-                    i_waddr.next = i
-                    i = i + 1
-                else:
-                    # print("Wait for space")
-                    pass
-                tick()
-                yield delay(5)
-                tick()
-                yield delay(5)
-            i_mode.next = IDLE
-            print("Wrote input, wait for end of decompression")
-
-            # alternative without sliding window:
-            """
-            print("WRITE")
-            i_mode.next = WRITE
-            for i in range(len(zl_data)):
-                i_data.next = zl_data[i]
-                i_waddr.next = i
-                tick()
-                yield delay(5)
-                tick()
-                yield delay(5)
-            i_mode.next = IDLE
-
-            print("STARTD")
-            i_mode.next = STARTD
-            tick()
-            yield delay(5)
-            tick()
-            yield delay(5)
-            i_mode.next = IDLE
-            """
-
-            print(now())
-            while not o_done:
-                tick()
-                yield delay(5)
-                tick()
-                yield delay(5)
-            print(now())
-
-            last = o_oprogress
-            print("GOT", last)
-            i_mode.next = READ
-            d_data = []
-            for i in range(last):
-                i_raddr.next = i
-                tick()
-                yield delay(5)
-                tick()
-                yield delay(5)
-                d_data.append(bytes([o_byte]))
-            i_mode.next = IDLE
-
-            d_data = b''.join(d_data)
-
-            self.assertEqual(b_data, d_data, "decompress does NOT match")
-            print(len(d_data), len(zl_data))
-
-            print("==========COMPRESS TEST=========")
-
-            i_mode.next = WRITE
-            for i in range(len(b_data)):
-                i_data.next = b_data[i]
-                i_waddr.next = i
-                tick()
-                yield delay(5)
-                tick()
-                yield delay(5)
-            i_mode.next = IDLE
-
-            i_mode.next = STARTC
-            tick()
-            yield delay(5)
-            tick()
-            yield delay(5)
-            i_mode.next = IDLE
-
-            print(now())
-            while not o_done:
-                tick()
-                yield delay(5)
-                tick()
-                yield delay(5)
-            print(now())
-
-            # raise Error("STOP")
-
-            last = o_oprogress
-            print("last", last)
-            i_mode.next = READ
-            c_data = []
-            for i in range(last):
-                i_raddr.next = i
-                tick()
-                yield delay(5)
-                tick()
-                yield delay(5)
-                c_data.append(bytes([o_byte]))
-            i_mode.next = IDLE
-
-            print("b_data:", len(b_data), b_data)
-            c_data = b''.join(c_data)
-            print("c_data:", len(c_data), c_data)
-            print("zl_data:", len(zl_data), zl_data)
-
-            print("zlib test:", zlib.decompress(c_data))
-
-            print("WRITE COMPRESSED RESULT")
-            i_mode.next = WRITE
-            for i in range(len(c_data)):
-                i_data.next = c_data[i]
-                i_waddr.next = i
-                tick()
-                yield delay(5)
-                tick()
-                yield delay(5)
-            i_mode.next = IDLE
-
-            print("STARTD after Compress")
-            i_mode.next = STARTD
-            tick()
-            yield delay(5)
-            tick()
-            yield delay(5)
-            i_mode.next = IDLE
-
-            print(now())
-            while not o_done:
-                tick()
-                yield delay(5)
-                tick()
-                yield delay(5)
-            print(now())
-
-            last = o_oprogress
-            i_mode.next = READ
-            d_data = []
-            for i in range(last):
-                i_raddr.next = i
-                tick()
-                yield delay(5)
-                tick()
-                yield delay(5)
-                d_data.append(bytes([o_byte]))
-            i_mode.next = IDLE
-
-            d_data = b''.join(d_data)
-
-            self.assertEqual(b_data, d_data, "decompress after compress does NOT match")
-            print(len(b_data), len(zl_data), len(c_data))
-
             print("==========STREAMING DECOMPRESS TEST=========")
 
             print("STREAM LENGTH", len(zl_data))
+
+            i_mode.next = IDLE
+            tick()
+            yield delay(5)
+            tick()
+            yield delay(5)
 
             print("STARTD")
             i_mode.next = STARTD
@@ -275,7 +114,7 @@ class TestDeflate(unittest.TestCase):
                     i_mode.next = WRITE
                     i_waddr.next = i
                     i_data.next = zl_data[i]
-                    print("write", i, zl_data[i])
+                    # print("write", i, zl_data[i])
                     if o_iprogress > i - MAXW:
                         i = i + 1
                     else:
@@ -309,6 +148,10 @@ class TestDeflate(unittest.TestCase):
                         break;
 
             i_mode.next = IDLE
+            tick()
+            yield delay(5)
+            tick()
+            yield delay(5)
 
             print("IN/OUT", len(zl_data), len(sresult))
             sresult = b''.join(sresult)
@@ -323,7 +166,6 @@ class TestDeflate(unittest.TestCase):
             yield delay(5)
             tick()
             yield delay(5)
-            i_mode.next = IDLE
 
             print("WRITE")
             i = 0
@@ -334,7 +176,7 @@ class TestDeflate(unittest.TestCase):
                 if i < slen:
                     i_mode.next = WRITE
                     i_waddr.next = i
-                    i_data.next = b_data[i % len(b_data)] # i & 0x1
+                    i_data.next = b_data[i % len(b_data)]
                     # print("write", i)
                     if o_iprogress > i - MAXW:
                         i = i + 1
@@ -373,7 +215,8 @@ class TestDeflate(unittest.TestCase):
             print("IN/OUT", slen, len(sresult))
             sresult = b''.join(sresult)
             print("zlib test:", zlib.decompress(sresult)[:60])
-            self.assertEqual(zlib.decompress(sresult)[:len(b_data)], b_data)
+            rlen = min(len(b_data), slen)
+            self.assertEqual(zlib.decompress(sresult)[:rlen], b_data[:rlen])
             print("DONE!")
 
 
@@ -412,7 +255,7 @@ SLOWDOWN = 1
 @block
 def test_deflate_bench(i_clk, o_led, led0_g, led1_b, led2_r):
 
-    u_data, c_data = test_data(1, 5)
+    u_data, c_data = test_data(1, 100, IBSIZE)
 
     CDATA = tuple(c_data)
     UDATA = tuple(u_data)

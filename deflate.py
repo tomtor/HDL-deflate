@@ -235,7 +235,7 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
         else:
             if isize < 4:
                 nb.next = 0
-                pass
+                old_di.next = 0
             elif i_mode == STARTC or i_mode == STARTD:
                 nb.next = 0
                 old_di.next = 0
@@ -244,7 +244,7 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
                 if do_compress:
                     print("FILL", di, old_di, nb, b1, b2, b3, b4)
                 """
-                if FAST and do_compress:
+                if FAST:  #  and do_compress:
                     shift = (di - old_di) * 8
                     """
                     if shift != 0:
@@ -799,6 +799,7 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
                 elif nb < 4:
                     pass
                 elif numLiterals == 0:
+                    print(di, isize)
                     numLiterals.next = 257 + get4(0, 5)
                     print("NL:", 257 + get4(0, 5))
                     numDistance.next = 1 + get4(5, 5)
@@ -1110,7 +1111,7 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
                         raise Error("< 1 bits: ")
                     adv(get_bits(leaf))
                     if get_code(leaf) == 0:
-                        print("leaf 0")
+                        print("leaf 0", di, isize)
                     code.next = get_code(leaf)
                     # print("ADV:", di, get_bits(leaf), get_code(leaf))
                     if method == 2:

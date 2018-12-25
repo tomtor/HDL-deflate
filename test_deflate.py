@@ -10,7 +10,7 @@ from myhdl import delay, now, Signal, intbv, ResetSignal, Simulation, \
 from deflate import IDLE, WRITE, READ, STARTC, STARTD, LBSIZE, IBSIZE, \
                     CWINDOW, COMPRESS, OBSIZE, LMAX, LIBSIZE
 
-MAXW = 2 * CWINDOW
+MAXW = CWINDOW
 
 COSIMULATION = True
 COSIMULATION = False
@@ -33,31 +33,30 @@ else:
                             clk=clk, reset=reset)
 
 
-def test_data(m):
-    print("MODE", m)
+def test_data(m, tlen=100):
+    print("MODE", m, tlen)
     if m == 0:
         str_data = " ".join(["Hello World! " + str(1) + " "
-                             for i in range(100)])
+                             for i in range(tlen)])
         b_data = str_data.encode('utf-8')
     elif m == 1:
         str_data = " ".join(["   Hello World! " + str(i) + "     "
-        # str_data = " ".join(["Hello World! " + str(i) + " "
-                             for i in range(5)])
+                             for i in range(tlen)])
         b_data = str_data.encode('utf-8')
     elif m == 2:
         str_data = " ".join(["Hi: " + str(random.randrange(0,0x1000)) + " "
-                             for i in range(100)])
+                             for i in range(tlen)])
         b_data = str_data.encode('utf-8')
     elif m == 3:
-        b_data = bytes([random.randrange(0,0x100) for i in range(100)])
+        b_data = bytes([random.randrange(0,0x100) for i in range(tlen)])
     elif m == 4:
         str_data = "".join([str(random.randrange(0,2))
-                             for i in range(1000)])
+                             for i in range(tlen)])
         b_data = str_data.encode('utf-8')
     else:
         raise Error("unknown test mode")
     # print(str_data)
-    b_data = b_data[:IBSIZE - 4 - 20]
+    b_data = b_data[:IBSIZE - 4 - 10]
     zl_data = zlib.compress(b_data)
     print("From %d to %d bytes" % (len(b_data), len(zl_data)))
     print(zl_data)
@@ -256,6 +255,66 @@ class TestDeflate(unittest.TestCase):
             self.assertEqual(b_data, d_data, "decompress after compress does NOT match")
             print(len(b_data), len(zl_data), len(c_data))
 
+            print("==========STREAMING DECOMPRESS TEST=========")
+
+            print("STREAM LENGTH", len(zl_data))
+
+            print("STARTD")
+            i_mode.next = STARTD
+            tick()
+            yield delay(5)
+            tick()
+            yield delay(5)
+
+            print("WRITE")
+            i = 0
+            ri = 0
+            sresult = []
+            while True:
+                if i < len(zl_data):
+                    i_mode.next = WRITE
+                    i_waddr.next = i
+                    i_data.next = zl_data[i]
+                    print("write", i, zl_data[i])
+                    if o_iprogress > i - MAXW:
+                        i = i + 1
+                    else:
+                        print("Wait for space", i)
+                        pass
+                else:
+                    i_mode.next = IDLE
+                tick()
+                yield delay(5)
+                tick()
+                yield delay(5)
+
+                if ri < o_oprogress:
+                    i_mode.next = READ
+                    i_raddr.next = ri
+                    tick()
+                    yield delay(5)
+                    tick()
+                    yield delay(5)
+                    tick()
+                    yield delay(5)
+                    tick()
+                    yield delay(5)
+                    print("read", ri, o_oprogress, o_byte)
+                    sresult.append(bytes([o_byte]))
+                    ri = ri + 1
+
+                if o_done:
+                    print("DONE", o_oprogress, o_iprogress)
+                    if o_oprogress == ri:
+                        break;
+
+            i_mode.next = IDLE
+
+            print("IN/OUT", len(zl_data), len(sresult))
+            sresult = b''.join(sresult)
+            self.assertEqual(b_data, sresult)
+            print("Decompress OK!")
+
             print("==========STREAMING COMPRESS TEST=========")
 
             print("STARTC")
@@ -269,13 +328,13 @@ class TestDeflate(unittest.TestCase):
             print("WRITE")
             i = 0
             ri = 0
-            slen = 500
+            slen = 50
             sresult = []
             while True:
-                i_mode.next = WRITE
-                i_waddr.next = i
-                i_data.next = i & 0x1
                 if i < slen:
+                    i_mode.next = WRITE
+                    i_waddr.next = i
+                    i_data.next = b_data[i % len(b_data)] # i & 0x1
                     # print("write", i)
                     if o_iprogress > i - MAXW:
                         i = i + 1
@@ -313,7 +372,8 @@ class TestDeflate(unittest.TestCase):
 
             print("IN/OUT", slen, len(sresult))
             sresult = b''.join(sresult)
-            print("zlib test:", zlib.decompress(sresult)[:20])
+            print("zlib test:", zlib.decompress(sresult)[:60])
+            self.assertEqual(zlib.decompress(sresult)[:len(b_data)], b_data)
             print("DONE!")
 
 
@@ -352,7 +412,7 @@ SLOWDOWN = 1
 @block
 def test_deflate_bench(i_clk, o_led, led0_g, led1_b, led2_r):
 
-    u_data, c_data = test_data(1)
+    u_data, c_data = test_data(1, 5)
 
     CDATA = tuple(c_data)
     UDATA = tuple(u_data)

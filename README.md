@@ -10,6 +10,8 @@ Usage should be clear from the test bench in `test_deflate.py`.
 # Tunable parameters
 
     OBSIZE = 8192   # Size of output buffer (BRAM)
+                    # You need 32768 to compress ALL valid deflate streams!
+
     IBSIZE = 2048   # Size of input buffer (LUT-RAM)
 
     CWINDOW = 32    # Search window for compression
@@ -18,7 +20,7 @@ Usage should be clear from the test bench in `test_deflate.py`.
 
 One can use a sliding window to reduce the size of the input buffer and the LUT-usage.
 
-The optimal value is 4 * CWINDOW (128 bytes), the first decompression in the UnitTest in `test_deflate.py`
+The minimal value is 2 * CWINDOW (64 bytes), the first decompression in the UnitTest in `test_deflate.py`
 uses this strategy.
 
 The compress mode can be disabled by setting `COMPRESS` to `False`.

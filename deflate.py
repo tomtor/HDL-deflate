@@ -27,7 +27,7 @@ FAST = True
 CWINDOW = 32    # Search window for compression
 
 OBSIZE = 8192   # Size of output buffer (BRAM)
-IBSIZE = 4 * CWINDOW  # 2048   # Size of input buffer (LUT-RAM)
+IBSIZE = 2 * CWINDOW  # Size of input buffer (LUT-RAM)
 LMAX = 20       # Size of progress and I/O counters
 
 if OBSIZE > IBSIZE:
@@ -234,6 +234,7 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
             old_di.next = 0
         else:
             if isize < 4:
+                nb.next = 0
                 pass
             elif i_mode == STARTC or i_mode == STARTD:
                 nb.next = 0
@@ -243,7 +244,7 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
                 if do_compress:
                     print("FILL", di, old_di, nb, b1, b2, b3, b4)
                 """
-                if FAST:
+                if FAST and do_compress:
                     shift = (di - old_di) * 8
                     """
                     if shift != 0:
@@ -258,6 +259,7 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
                     nb.next = 4
                 old_di.next = di
 
+                # print("B1", iram[di & IBS])
                 b1.next = iram[di & IBS]
                 b2.next = iram[di+1 & IBS]
                 b3.next = iram[di+2 & IBS]

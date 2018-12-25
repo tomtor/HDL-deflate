@@ -1240,7 +1240,10 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
                 elif nb < 4:
                     pass
                 elif method == 0:
-                    if cur_i < length:
+                    if di >= isize - 2:
+                        print("HOLD")
+                        pass
+                    elif cur_i < length:
                         oaddr.next = do
                         obyte.next = b3
                         adv(8)

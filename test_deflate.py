@@ -279,7 +279,7 @@ class TestDeflate(unittest.TestCase):
                     if o_iprogress > i - MAXW:
                         i = i + 1
                     else:
-                        print("Wait for space", i)
+                        # print("Wait for space", i)
                         pass
                 else:
                     i_mode.next = IDLE
@@ -339,7 +339,7 @@ class TestDeflate(unittest.TestCase):
                     if o_iprogress > i - MAXW:
                         i = i + 1
                     else:
-                        print("Wait for space", i)
+                        # print("Wait for space", i)
                         pass
                 else:
                     i_mode.next = IDLE

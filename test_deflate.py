@@ -8,7 +8,7 @@ from myhdl import delay, now, Signal, intbv, ResetSignal, Simulation, \
                   always, always_seq, always_comb, enum, Error
 
 from deflate import IDLE, WRITE, READ, STARTC, STARTD, LBSIZE, IBSIZE, \
-                    CWINDOW, COMPRESS, OBSIZE, LMAX, LIBSIZE
+                    CWINDOW, COMPRESS, DECOMPRESS, OBSIZE, LMAX, LIBSIZE
 
 MAXW = CWINDOW
 
@@ -79,7 +79,7 @@ class TestDeflate(unittest.TestCase):
             print("START TEST MODE", mode)
             print("==========================")
 
-            b_data, zl_data = test_data(mode)
+            b_data, zl_data = test_data(mode, 10)
 
             reset.next = 0
             tick()
@@ -88,79 +88,83 @@ class TestDeflate(unittest.TestCase):
             tick()
             yield delay(5)
 
-            print("==========STREAMING DECOMPRESS TEST=========")
+            if DECOMPRESS:
+                print("==========STREAMING DECOMPRESS TEST=========")
 
-            print("STREAM LENGTH", len(zl_data))
+                print("STREAM LENGTH", len(zl_data))
 
-            i_mode.next = IDLE
-            tick()
-            yield delay(5)
-            tick()
-            yield delay(5)
+                i_mode.next = IDLE
+                tick()
+                yield delay(5)
+                tick()
+                yield delay(5)
 
-            print("STARTD")
-            i_mode.next = STARTD
-            tick()
-            yield delay(5)
-            tick()
-            yield delay(5)
+                print("STARTD")
+                i_mode.next = STARTD
+                tick()
+                yield delay(5)
+                tick()
+                yield delay(5)
 
-            print("WRITE")
-            i = 0
-            ri = 0
-            first = 1
-            sresult = []
-            start = now()
-            wait = 0
-            while True:
-                if i < len(zl_data):
-                    i_mode.next = WRITE
-                    i_waddr.next = i
-                    i_data.next = zl_data[i]
-                    # print("write", i, zl_data[i])
-                    if o_iprogress > i - MAXW:
-                        i = i + 1
+                print("WRITE")
+                i = 0
+                ri = 0
+                first = 1
+                sresult = []
+                start = now()
+                wait = 0
+                while True:
+                    if ri < o_oprogress - 1 or o_done:
+                        did_read = 1
+                        # print("do read", ri, o_oprogress)
+                        i_mode.next = READ
+                        i_raddr.next = ri
+                        tick()
+                        yield delay(5)
+                        tick()
+                        yield delay(5)
+                        ri = ri + 1
                     else:
-                        # print("Wait for space", i)
-                        wait += 1
-                else:
-                    i_mode.next = IDLE
+                        did_read = 0
+
+                    if i < len(zl_data):
+                        if o_iprogress > i - MAXW:
+                            i_mode.next = WRITE
+                            i_waddr.next = i
+                            i_data.next = zl_data[i]
+                            # print("write", i, zl_data[i])
+                            i = i + 1
+                        else:
+                            # print("Wait for space", i)
+                            wait += 1
+                    else:
+                        i_mode.next = IDLE
+
+                    tick()
+                    yield delay(5)
+                    tick()
+                    yield delay(5)
+
+                    if did_read:
+                        # print("read", ri, o_oprogress, o_byte)
+                        sresult.append(bytes([o_byte]))
+
+                    if o_done:
+                        # print("DONE", o_oprogress, ri)
+                        if o_oprogress == ri:
+                            break;
+
+                i_mode.next = IDLE
                 tick()
                 yield delay(5)
                 tick()
                 yield delay(5)
 
-                if ri < o_oprogress:
-                    i_mode.next = READ
-                    i_raddr.next = ri
-                    tick()
-                    yield delay(5)
-                    tick()
-                    yield delay(5)
-                    tick()
-                    yield delay(5)
-                    tick()
-                    yield delay(5)
-                    # print("read", ri, o_oprogress, o_byte)
-                    sresult.append(bytes([o_byte]))
-                    ri = ri + 1
-
-                if o_done:
-                    # print("DONE", o_oprogress, o_iprogress)
-                    if o_oprogress == ri:
-                        break;
-
-            i_mode.next = IDLE
-            tick()
-            yield delay(5)
-            tick()
-            yield delay(5)
-
-            print("IN/OUT/CYCLES/WAIT", len(zl_data), len(sresult),
-                  now() - start, wait)
-            sresult = b''.join(sresult)
-            self.assertEqual(b_data, sresult)
-            print("Decompress OK!")
+                print("IN/OUT/CYCLES/WAIT", len(zl_data), len(sresult),
+                      (now() - start) // 10, wait)
+                sresult = b''.join(sresult)
+                self.assertEqual(b_data, sresult)
+                print("Decompress OK!")
 
             print("==========STREAMING COMPRESS TEST=========")
 
@@ -219,7 +223,7 @@ class TestDeflate(unittest.TestCase):
             i_mode.next = IDLE
 
             print("IN/OUT/CYCLES/WAIT", slen, len(sresult),
-                  now() - start, wait)
+                  (now() - start) // 10, wait)
             sresult = b''.join(sresult)
             print("zlib test:", zlib.decompress(sresult)[:60])
             rlen = min(len(b_data), slen)

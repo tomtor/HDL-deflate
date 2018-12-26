@@ -23,8 +23,6 @@ One can use a sliding window to reduce the size of the input buffer and the LUT-
 The minimal value is 2 * CWINDOW (64 bytes), the first decompression in the UnitTest in `test_deflate.py`
 uses this strategy.
 
-The compress mode can be disabled by setting `COMPRESS` to `False`.
-
 By default the compressor will reduce repeated 3/4/5 byte sequences in the search window to 15 bit.
 This will result in a decent compression ratio for many real life input data patterns.
 
@@ -36,6 +34,11 @@ Another strategy for data sets with just a small set of used byte values would b
 to use a dedicated pre-computed Huffman tree. I could add this if there is interest, but it is probably
 better to use a more dense coding in your FPGA application data in the first place.
 
+The compress mode can be disabled by setting `COMPRESS` to `False`.
+
+The decompress mode can be disabled by setting `DECOMPRESS` to `False`.
+FAST MATCH10 compress only has quite good resource usage.
+
 ## Compression speed
 
 To reduce LUT usage the original implementation matched each slot in the search window in a dedicated clock cycle.
@@ -44,7 +47,7 @@ The effective speed will be around 1 input byte every two cycles.
 
 # FPGA validation
 
-## Default
+## Minimal
 
 Resource|Estimation
 --------|----------
@@ -61,6 +64,15 @@ LUT	|5769
 LUTRAM	|512
 FF	|2169
 BRAM	|4
+
+## Decompress False and FAST and MATCH10
+
+Resource|Estimation
+--------|----------
+LUT	|5118
+LUTRAM	|84
+FF	|1577
+BRAM	|2
 
 ## MATCH10
 
@@ -84,9 +96,9 @@ BRAM	|4
 
 Resource|Estimation
 --------|----------
-LUT	|12480
-LUTRAM	|488
-FF	|3607
+LUT	|11888
+LUTRAM	|536
+FF	|3308
 BRAM	|4
 
 ## Speed

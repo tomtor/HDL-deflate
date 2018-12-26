@@ -33,7 +33,7 @@ else:
                             clk=clk, reset=reset)
 
 
-def test_data(m, tlen=20, limit=False):
+def test_data(m, tlen=100, limit=False):
     print("MODE", m, tlen)
     if m == 0:
         str_data = " ".join(["Hello World! " + str(1) + " "
@@ -108,7 +108,10 @@ class TestDeflate(unittest.TestCase):
             print("WRITE")
             i = 0
             ri = 0
+            first = 1
             sresult = []
+            start = now()
+            wait = 0
             while True:
                 if i < len(zl_data):
                     i_mode.next = WRITE
@@ -119,7 +122,7 @@ class TestDeflate(unittest.TestCase):
                         i = i + 1
                     else:
                         # print("Wait for space", i)
-                        pass
+                        wait += 1
                 else:
                     i_mode.next = IDLE
                 tick()
@@ -138,12 +141,12 @@ class TestDeflate(unittest.TestCase):
                     yield delay(5)
                     tick()
                     yield delay(5)
-                    print("read", ri, o_oprogress, o_byte)
+                    # print("read", ri, o_oprogress, o_byte)
                     sresult.append(bytes([o_byte]))
                     ri = ri + 1
 
                 if o_done:
-                    print("DONE", o_oprogress, o_iprogress)
+                    # print("DONE", o_oprogress, o_iprogress)
                     if o_oprogress == ri:
                         break;
 
@@ -153,7 +156,8 @@ class TestDeflate(unittest.TestCase):
             tick()
             yield delay(5)
 
-            print("IN/OUT", len(zl_data), len(sresult))
+            print("IN/OUT/CYCLES/WAIT", len(zl_data), len(sresult),
+                  now() - start, wait)
             sresult = b''.join(sresult)
             self.assertEqual(b_data, sresult)
             print("Decompress OK!")
@@ -172,6 +176,8 @@ class TestDeflate(unittest.TestCase):
             ri = 0
             slen = 50
             sresult = []
+            wait = 0
+            start = now()
             while True:
                 if i < slen:
                     i_mode.next = WRITE
@@ -182,7 +188,7 @@ class TestDeflate(unittest.TestCase):
                         i = i + 1
                     else:
                         # print("Wait for space", i)
-                        pass
+                        wait += 1
                 else:
                     i_mode.next = IDLE
                 tick()
@@ -201,18 +207,19 @@ class TestDeflate(unittest.TestCase):
                     yield delay(5)
                     tick()
                     yield delay(5)
-                    print("read", ri, o_oprogress, o_byte)
+                    # print("read", ri, o_oprogress, o_byte)
                     sresult.append(bytes([o_byte]))
                     ri = ri + 1
 
                 if o_done:
-                    print("DONE", o_oprogress, o_iprogress)
+                    # print("DONE", o_oprogress, o_iprogress)
                     if o_oprogress == ri:
                         break;
 
             i_mode.next = IDLE
 
-            print("IN/OUT", slen, len(sresult))
+            print("IN/OUT/CYCLES/WAIT", slen, len(sresult),
+                  now() - start, wait)
             sresult = b''.join(sresult)
             print("zlib test:", zlib.decompress(sresult)[:60])
             rlen = min(len(b_data), slen)

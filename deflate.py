@@ -102,7 +102,7 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
     CODEBITS = 10 # MaxCodeLength
     BITBITS = 9
 
-    codeLength = [Signal(intbv()[4:]) for _ in range(MaxBitLength+2)]
+    codeLength = [Signal(intbv()[4:]) for _ in range(MaxBitLength+32)]
     bits = Signal(intbv()[4:])
     bitLengthCount = [Signal(intbv()[9:]) for _ in range(MaxCodeLength+1)]
     nextCode = [Signal(intbv()[CODEBITS:]) for _ in range(MaxCodeLength)]

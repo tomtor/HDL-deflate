@@ -28,9 +28,13 @@ FAST = True
 
 CWINDOW = 32    # Search window for compression
 
-OBSIZE = 32768   # Size of output buffer (BRAM)
-#IBSIZE = 2 * CWINDOW  # Size of input buffer (LUT-RAM)
-IBSIZE = 16384  # Size of input buffer (LUT-RAM)
+OBSIZE = 8192   # Size of output buffer (BRAM)
+OBSIZE = 65536   # Size of output buffer for ANY input (BRAM)
+
+# Size of input buffer (LUT-RAM)
+IBSIZE = 2 * CWINDOW  # Minimal window
+IBSIZE = 16 * CWINDOW  # This size gives method 2 for testbench
+
 LMAX = 20       # Size of progress and I/O counters
 
 if OBSIZE > IBSIZE:
@@ -80,7 +84,7 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
     oram = [Signal(intbv()[8:]) for _ in range(OBSIZE)]
 
     oaddr = Signal(modbv()[LBSIZE:])
-    oraddr = Signal(intbv()[LBSIZE:])
+    oraddr = Signal(modbv()[LBSIZE:])
     obyte = Signal(intbv()[8:])
     orbyte = Signal(intbv()[8:])
 
@@ -99,7 +103,7 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
 
     CodeLengths = 19
     MaxCodeLength = 15
-    InstantMaxBit = 10
+    InstantMaxBit = 9
     EndOfBlock = 256
     MaxBitLength = 288
     # MaxToken = 285
@@ -112,11 +116,11 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
     bits = Signal(intbv()[4:])
     bitLengthCount = [Signal(intbv()[9:]) for _ in range(MaxCodeLength+1)]
     nextCode = [Signal(intbv()[CODEBITS:]) for _ in range(MaxCodeLength)]
-    reverse = Signal(intbv()[CODEBITS:])
-    code_bits = [Signal(intbv()[11:]) for _ in range(MaxBitLength)]
+    reverse = Signal(modbv()[CODEBITS:])
+    code_bits = [Signal(intbv()[MaxCodeLength:]) for _ in range(MaxBitLength)]
     distanceLength = [Signal(intbv()[4:]) for _ in range(32)]
 
-    leaves = [Signal(intbv()[CODEBITS + BITBITS:]) for _ in range(2048)]
+    leaves = [Signal(intbv()[CODEBITS + BITBITS:]) for _ in range(4096)]
     lwaddr = Signal(intbv()[11:])
     # lraddr = Signal(intbv()[9:])
     if DECOMPRESS:
@@ -145,17 +149,17 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
 
     cur_i = Signal(intbv()[LMAX:])
     spread_i = Signal(intbv()[9:])
-    cur_HF1 = Signal(intbv()[12:])
+    cur_HF1 = Signal(intbv()[14:])
     cur_static = Signal(intbv()[9:])
     cur_cstatic = Signal(intbv()[LMAX:])
     # cur_search = Signal(intbv(min=-CWINDOW,max=IBSIZE))
     cur_search = Signal(intbv(min=-1,max=1<<LMAX))
     cur_dist = Signal(intbv(min=-CWINDOW,max=IBSIZE))
-    # cur_next = Signal(intbv()[5:])
-    cur_next = Signal(bool())
+    cur_next = Signal(intbv()[4:])
+    # cur_next = Signal(bool())
 
     length = Signal(intbv()[LBSIZE:])
-    offset = Signal(intbv()[LBSIZE:])
+    offset = Signal(modbv()[LBSIZE:])
 
     di = Signal(modbv()[LMAX:])
     old_di = Signal(intbv()[LMAX:])
@@ -856,7 +860,7 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
                     else:
                         raise Error("Invalid data")
 
-                    print(numCodeLength, howOften, code, di, n_adv)
+                    # print(numCodeLength, howOften, code, di, n_adv)
                     if n_adv != 0:
                         adv(n_adv)
 
@@ -1112,11 +1116,18 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
                 elif cur_next == 0:
                     # print("INIT:", di, dio, instantMaxBit, maxBits)
                     cto = get4(0, maxBits)
-                    cur_next.next = 1  # instantMaxBit
                     mask = (1 << instantMaxBit) - 1
                     # lraddr.next = (cto & mask)
                     leaf.next = leaves[cto & mask]
+                    cur_next.next = instantMaxBit + 1
                     # print(cur_next, mask, leaf, maxBits)
+                elif get_bits(leaf) >= cur_next:
+                    print("CACHE MISS")
+                    cto = get4(0, maxBits)
+                    mask = (1 << cur_next) - 1
+                    # lraddr.next = (cto & mask)
+                    leaf.next = leaves[cto & mask]
+                    cur_next.next = cur_next + 1
                 else:
                     if get_bits(leaf) < 1:
                         print("< 1 bits: ")
@@ -1143,7 +1154,7 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
                     pass
                 else:
                     # print("D_INIT:", di, dio, d_instantMaxBit, d_maxBits)
-                    if d_instantMaxBit > d_maxBits:
+                    if d_instantMaxBit > InstantMaxBit:
                         raise Error("???")
                     token = code - 257
                     # print("token: ", token)
@@ -1171,7 +1182,7 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
                     distanceCode = get_code(leaf)
                     # print("distance code:", distanceCode)
                     distance = CopyDistance[distanceCode]
-                    print("distance:", distance)
+                    # print("distance:", distance)
                     moreBits = ExtraDistanceBits[distanceCode >> 1]
                     # print("more bits:", moreBits)
                     # print("bits:", get_bits(leaf))
@@ -1184,11 +1195,11 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
                     adv(moreBits + extraLength + get_bits(leaf))
                     # print("offset:", do - distance)
                     # print("FAIL?: ", di, dio, do, b1, b2, b3, b4)
-                    offset.next = (do - distance) & OBS
+                    offset.next = do - distance
                     length.next = tlength
                     # cur_next.next = 0
                     cur_i.next = 0
-                    oraddr.next = (do - distance) & OBS
+                    oraddr.next = do - distance
                     state.next = d_state.COPY
 
             elif state == d_state.INFLATE:
@@ -1211,6 +1222,7 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
                     print("EOF:", di, do)
                     if not final:
                         state.next = d_state.HEADER
+                        print("New Block!")
                     else:
                         o_done.next = True
                         o_oprogress.next = do + 1
@@ -1284,7 +1296,8 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
                         o_done.next = True
                         state.next = d_state.IDLE
                 elif cur_i < length + 2:
-                    oraddr.next = (offset + cur_i) & OBS
+                    # print("L/O", length, offset)
+                    oraddr.next = offset + cur_i
                     if cur_i == 1:
                         copy1.next = orbyte
                         # print("c1", cur_i, length, offset, do, orbyte)
@@ -1292,9 +1305,9 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
                         copy2.next = orbyte
                     if cur_i > 1:
                         # Special 1 byte offset handling:
-                        if offset + cur_i == do + 1:
+                        if (offset + cur_i) & OBS == (do + 1) & OBS:
                             obyte.next = copy1
-                        elif cur_i == 3 or offset + cur_i != do:
+                        elif cur_i == 3 or (offset + cur_i) & OBS != do & OBS:
                             obyte.next = orbyte
                         # Special 2 byte offset handling:
                         elif cur_i > 2:

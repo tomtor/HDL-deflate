@@ -178,7 +178,7 @@ class TestDeflate(unittest.TestCase):
             print("WRITE")
             i = 0
             ri = 0
-            slen = 50
+            slen = 500
             sresult = []
             wait = 0
             start = now()

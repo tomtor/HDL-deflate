@@ -79,7 +79,7 @@ class TestDeflate(unittest.TestCase):
             print("START TEST MODE", mode)
             print("==========================")
 
-            b_data, zl_data = test_data(mode, 10)
+            b_data, zl_data = test_data(mode, 500)
 
             reset.next = 0
             tick()
@@ -114,7 +114,7 @@ class TestDeflate(unittest.TestCase):
                 start = now()
                 wait = 0
                 while True:
-                    if ri < o_oprogress - 1 or o_done:
+                    if ri < o_oprogress - 1: # or o_done:
                         did_read = 1
                         # print("do read", ri, o_oprogress)
                         i_mode.next = READ
@@ -151,7 +151,7 @@ class TestDeflate(unittest.TestCase):
 
                     if o_done:
                         # print("DONE", o_oprogress, ri)
-                        if o_oprogress == ri:
+                        if o_oprogress == ri + 1:
                             break;
 
                 i_mode.next = IDLE
@@ -183,40 +183,43 @@ class TestDeflate(unittest.TestCase):
             wait = 0
             start = now()
             while True:
-                if i < slen:
-                    i_mode.next = WRITE
-                    i_waddr.next = i
-                    i_data.next = b_data[i % len(b_data)]
-                    # print("write", i)
-                    if o_iprogress > i - MAXW:
-                        i = i + 1
-                    else:
-                        # print("Wait for space", i)
-                        wait += 1
-                else:
-                    i_mode.next = IDLE
-                tick()
-                yield delay(5)
-                tick()
-                yield delay(5)
-
-                if ri < o_oprogress:
+                if ri < o_oprogress - 1 or o_done:
+                    did_read = 1
+                    # print("do read", ri, o_oprogress)
                     i_mode.next = READ
                     i_raddr.next = ri
                     tick()
                     yield delay(5)
                     tick()
                     yield delay(5)
-                    tick()
-                    yield delay(5)
-                    tick()
-                    yield delay(5)
+                    ri = ri + 1
+                else:
+                    did_read = 0
+
+                if i < slen:
+                    if o_iprogress > i - MAXW:
+                        i_mode.next = WRITE
+                        i_waddr.next = i
+                        i_data.next = b_data[i % len(b_data)]
+                        # print("write", i, b_data[i % len(b_data)])
+                        i = i + 1
+                    else:
+                        # print("Wait for space", i)
+                        wait += 1
+                else:
+                    i_mode.next = IDLE
+
+                tick()
+                yield delay(5)
+                tick()
+                yield delay(5)
+
+                if did_read:
                     # print("read", ri, o_oprogress, o_byte)
                     sresult.append(bytes([o_byte]))
-                    ri = ri + 1
 
                 if o_done:
-                    # print("DONE", o_oprogress, o_iprogress)
+                    # print("DONE", o_oprogress, ri)
                     if o_oprogress == ri:
                         break;
 

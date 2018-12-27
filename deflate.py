@@ -28,8 +28,9 @@ FAST = True
 
 CWINDOW = 32    # Search window for compression
 
-OBSIZE = 8192   # Size of output buffer (BRAM)
-IBSIZE = 2 * CWINDOW  # Size of input buffer (LUT-RAM)
+OBSIZE = 32768   # Size of output buffer (BRAM)
+#IBSIZE = 2 * CWINDOW  # Size of input buffer (LUT-RAM)
+IBSIZE = 16384  # Size of input buffer (LUT-RAM)
 LMAX = 20       # Size of progress and I/O counters
 
 if OBSIZE > IBSIZE:
@@ -38,7 +39,10 @@ else:
     LBSIZE = int(log2(IBSIZE))
 
 LIBSIZE = int(log2(IBSIZE))
+LOBSIZE = int(log2(OBSIZE))
+
 IBS = (1 << LIBSIZE) - 1
+OBS = (1 << LOBSIZE) - 1
 
 d_state = enum('IDLE', 'HEADER', 'BL', 'READBL', 'REPEAT', 'DISTTREE', 'INIT3',
                'HF1', 'HF1INIT', 'HF2', 'HF3', 'HF4', 'HF4_2', 'HF4_3',
@@ -80,7 +84,7 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
     obyte = Signal(intbv()[8:])
     orbyte = Signal(intbv()[8:])
 
-    iraddr = Signal(modbv()[LIBSIZE:])
+    # iraddr = Signal(modbv()[LIBSIZE:])
 
     isize = Signal(intbv()[LMAX:])
     state = Signal(d_state.IDLE)
@@ -101,22 +105,22 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
     # MaxToken = 285
     InvalidToken = 300
 
-    CODEBITS = 10 # MaxCodeLength
-    BITBITS = 9
+    CODEBITS = MaxCodeLength
+    BITBITS = 4
 
     codeLength = [Signal(intbv()[4:]) for _ in range(MaxBitLength+32)]
     bits = Signal(intbv()[4:])
     bitLengthCount = [Signal(intbv()[9:]) for _ in range(MaxCodeLength+1)]
     nextCode = [Signal(intbv()[CODEBITS:]) for _ in range(MaxCodeLength)]
     reverse = Signal(intbv()[CODEBITS:])
-    code_bits = [Signal(intbv()[9:]) for _ in range(MaxBitLength)]
+    code_bits = [Signal(intbv()[11:]) for _ in range(MaxBitLength)]
     distanceLength = [Signal(intbv()[4:]) for _ in range(32)]
 
-    leaves = [Signal(intbv()[CODEBITS + BITBITS:]) for _ in range(512)]
-    lwaddr = Signal(intbv()[9:])
+    leaves = [Signal(intbv()[CODEBITS + BITBITS:]) for _ in range(2048)]
+    lwaddr = Signal(intbv()[11:])
     # lraddr = Signal(intbv()[9:])
     if DECOMPRESS:
-        d_leaves = [Signal(intbv()[CODEBITS + BITBITS:]) for _ in range(128)]
+        d_leaves = [Signal(intbv()[CODEBITS + BITBITS:]) for _ in range(512)]
     else:
         d_leaves = [Signal(bool())]
     # rleaf = Signal(intbv()[CODEBITS + BITBITS:])
@@ -130,8 +134,8 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
     d_instantMaxBit = Signal(intbv()[InstantMaxBit:])
     instantMask = Signal(intbv()[MaxCodeLength:])
     d_instantMask = Signal(intbv()[MaxCodeLength:])
-    spread = Signal(intbv()[10:])
-    step = Signal(intbv()[10:])
+    spread = Signal(intbv()[InstantMaxBit:])
+    step = Signal(intbv()[InstantMaxBit:])
 
     static = Signal(bool())
 
@@ -141,7 +145,7 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
 
     cur_i = Signal(intbv()[LMAX:])
     spread_i = Signal(intbv()[9:])
-    cur_HF1 = Signal(intbv()[10:])
+    cur_HF1 = Signal(intbv()[12:])
     cur_static = Signal(intbv()[9:])
     cur_cstatic = Signal(intbv()[LMAX:])
     # cur_search = Signal(intbv(min=-CWINDOW,max=IBSIZE))
@@ -205,7 +209,7 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
     @always(clk.posedge)
     def oramwrite():
         oram[oaddr].next = obyte
-        leaves[lwaddr].next = wleaf
+        # leaves[lwaddr].next = wleaf
 
     @always(clk.posedge)
     def oramread():
@@ -262,6 +266,7 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
 
                 if old_di == di:
                     nb.next = 4
+
                 old_di.next = di
 
                 # print("B1", iram[di & IBS])
@@ -338,6 +343,8 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
         if b >= 1 << nb:
             raise Error("too few bits")
             print("too few bits")
+        if nb >= 15:
+            raise Error("nb too large")
         r = (((b >> 14) & 0x1) << 0) | (((b >> 13) & 0x1) << 1) | \
             (((b >> 12) & 0x1) << 2) | (((b >> 11) & 0x1) << 3) | \
             (((b >> 10) & 0x1) << 4) | (((b >> 9) & 0x1) << 5) | \
@@ -537,24 +544,28 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
                         oaddr.next = do
                         obyte.next = adler2 >> 8
                         do.next = do + 1
+                        o_oprogress.next = do + 1
                     elif cur_cstatic - 3 == isize + 4:
                         print("c2")
                         oaddr.next = do
                         obyte.next = adler2 & 0xFF
                         do.next = do + 1
+                        o_oprogress.next = do + 1
                     elif cur_cstatic - 3 == isize + 5:
                         print("c3")
                         oaddr.next = do
                         obyte.next = adler1 >> 8
                         do.next = do + 1
+                        o_oprogress.next = do + 1
                     elif cur_cstatic - 3 == isize + 6:
                         print("c4")
                         oaddr.next = do
                         obyte.next = adler1 & 0xFF
+                        o_oprogress.next = do + 1
                     elif cur_cstatic - 3 == isize + 7:
                         print("EOF finish", do)
                         o_done.next = True
-                        o_oprogress.next = do + 1
+                        # o_oprogress.next = do + 1
                         state.next = d_state.IDLE
                     else:
                         print(cur_cstatic, isize)
@@ -579,7 +590,7 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
                     pass
                 elif flush:
                     do_flush()
-                elif cur_i == 64:
+                elif cur_i == 1024:
                     lencode = length + 254
                     # print("fast:", distance, di, isize, match)
                     outlen = codeLength[lencode]
@@ -671,7 +682,7 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
                     # distance = di - cur_search
                     print("d/l", di, distance, match)
                     cur_dist.next = distance
-                    cur_i.next = 64
+                    cur_i.next = 1024
                     # adv(match * 8)
                     di.next = di + match
                     cur_cstatic.next = cur_cstatic + match - 1
@@ -748,7 +759,7 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
                             distance = di - cur_search
                             # print("distance", distance)
                             cur_dist.next = distance
-                            cur_i.next = 64  # 0
+                            cur_i.next = 1024  # 0
                             # adv(match * 8)
                             di.next = di + match
                             cur_cstatic.next = cur_cstatic + match - 1
@@ -845,7 +856,7 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
                     else:
                         raise Error("Invalid data")
 
-                    # print(numCodeLength, howOften, code, di, n_adv)
+                    print(numCodeLength, howOften, code, di, n_adv)
                     if n_adv != 0:
                         adv(n_adv)
 
@@ -869,11 +880,11 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
 
                 if not DECOMPRESS:
                     pass
-                elif cur_i < MaxBitLength:
+                elif cur_i < len(codeLength): # MaxBitLength:
                     codeLength[cur_i].next = 0
                     cur_i.next = cur_i + 1
                 else:
-                    numCodeLength.next = MaxBitLength
+                    # numCodeLength.next = MaxBitLength
                     method.next = 3  # Start building bit tree
                     cur_HF1.next = 0
                     state.next = d_state.HF1
@@ -911,9 +922,9 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
                 if DECOMPRESS and cur_HF1 < len(d_leaves):
                     d_leaves[cur_HF1].next = 0
                 if method != 4 and cur_HF1 < len(leaves):
-                    lwaddr.next = cur_HF1
-                    wleaf.next = 0
-                    # leaves[cur_HF1].next = 0
+                    # lwaddr.next = cur_HF1
+                    # wleaf.next = 0
+                    leaves[cur_HF1].next = 0
                 limit = len(leaves)
                 if method == 4:
                     limit = len(d_leaves)
@@ -1026,9 +1037,9 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
                         state.next = d_state.HF4
                         spread_i.next = spread_i + 1
                 else:
-                    wleaf.next = leaf
-                    lwaddr.next = reverse
-                    # leaves[reverse].next = leaf # makeLeaf(spread_i, bits)
+                    # wleaf.next = leaf
+                    # lwaddr.next = reverse
+                    leaves[reverse].next = leaf # makeLeaf(spread_i, bits)
                     code_bits[spread_i].next = reverse
                     if bits <= instantMaxBit:
                         if reverse + (1 << bits) <= instantMask:
@@ -1051,6 +1062,7 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
                         bits.next = bits_next
                         state.next = d_state.HF4_2
                     else:
+                        # print("SKIP UNUSED")
                         spread_i.next = spread_i + 1
                 else:
                     if do_compress:
@@ -1076,9 +1088,9 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
                     d_leaves[spread].next = makeLeaf(
                         spread_i, codeLength[spread_i])
                 else:
-                    lwaddr.next = spread
-                    wleaf.next = makeLeaf(spread_i, codeLength[spread_i])
-                    # leaves[spread].next = makeLeaf(spread_i, codeLength[spread_i])
+                    # lwaddr.next = spread
+                    # wleaf.next = makeLeaf(spread_i, codeLength[spread_i])
+                    leaves[spread].next = makeLeaf(spread_i, codeLength[spread_i])
                 # print("SPREAD:", spread, step, instantMask)
                 aim = instantMask
                 if method == 4:
@@ -1131,10 +1143,13 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
                     pass
                 else:
                     # print("D_INIT:", di, dio, d_instantMaxBit, d_maxBits)
+                    if d_instantMaxBit > d_maxBits:
+                        raise Error("???")
                     token = code - 257
                     # print("token: ", token)
                     extraLength = ExtraLengthBits[token]
                     # print("extra length bits:", extraLength)
+                    # print("d_maxBits", d_maxBits, d_instantMaxBit)
                     cto = get4(extraLength, d_maxBits)
                     mask = (1 << d_instantMaxBit) - 1
                     leaf.next = d_leaves[cto & mask]
@@ -1156,22 +1171,24 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
                     distanceCode = get_code(leaf)
                     # print("distance code:", distanceCode)
                     distance = CopyDistance[distanceCode]
-                    # print("distance:", distance)
+                    print("distance:", distance)
                     moreBits = ExtraDistanceBits[distanceCode >> 1]
                     # print("more bits:", moreBits)
                     # print("bits:", get_bits(leaf))
                     mored = get4(extraLength + get_bits(leaf), moreBits)
                     # print("mored:", mored)
                     distance += mored
-                    # print("distance more:", distance)
+                    # print("distance more:", distance, do, di, isize)
+                    if distance > do:
+                        raise Error("distance too big")
                     adv(moreBits + extraLength + get_bits(leaf))
                     # print("offset:", do - distance)
                     # print("FAIL?: ", di, dio, do, b1, b2, b3, b4)
-                    offset.next = do - distance
+                    offset.next = (do - distance) & OBS
                     length.next = tlength
                     # cur_next.next = 0
                     cur_i.next = 0
-                    oraddr.next = do - distance
+                    oraddr.next = (do - distance) & OBS
                     state.next = d_state.COPY
 
             elif state == d_state.INFLATE:
@@ -1196,7 +1213,7 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
                         state.next = d_state.HEADER
                     else:
                         o_done.next = True
-                        o_oprogress.next = do
+                        o_oprogress.next = do + 1
                         state.next = d_state.IDLE
                 else:
                     if code < EndOfBlock:
@@ -1263,11 +1280,11 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
                     elif not final:
                         state.next = d_state.HEADER
                     else:
-                        o_oprogress.next = do # + 1
+                        o_oprogress.next = do + 1
                         o_done.next = True
                         state.next = d_state.IDLE
                 elif cur_i < length + 2:
-                    oraddr.next = offset + cur_i
+                    oraddr.next = (offset + cur_i) & OBS
                     if cur_i == 1:
                         copy1.next = orbyte
                         # print("c1", cur_i, length, offset, do, orbyte)
@@ -1278,7 +1295,7 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
                         if offset + cur_i == do + 1:
                             obyte.next = copy1
                         elif cur_i == 3 or offset + cur_i != do:
-                             obyte.next = orbyte
+                            obyte.next = orbyte
                         # Special 2 byte offset handling:
                         elif cur_i > 2:
                             if cur_i & 1:

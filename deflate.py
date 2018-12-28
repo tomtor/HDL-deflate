@@ -18,6 +18,7 @@ from myhdl import always, block, Signal, intbv, Error, ResetSignal, \
 IDLE, RESET, WRITE, READ, STARTC, STARTD = range(6)
 
 COMPRESS = True
+DECOMPRESS = False
 DECOMPRESS = True
 
 MATCH10 = False
@@ -29,13 +30,13 @@ FAST = True
 CWINDOW = 32    # Search window for compression
 
 OBSIZE = 8192   # Size of output buffer (BRAM)
-OBSIZE = 65536   # Size of output buffer for ANY input (BRAM)
+OBSIZE = 32768  # Size of output buffer for ANY input (BRAM)
 
 # Size of input buffer (LUT-RAM)
-IBSIZE = 2 * CWINDOW  # Minimal window
-IBSIZE = 16 * CWINDOW  # This size gives method 2 for testbench
+IBSIZE = 16 * CWINDOW  # This size gives method 2 (dynamic tree) for testbench
+IBSIZE = 2 * CWINDOW   # Minimal window
 
-LMAX = 20       # Size of progress and I/O counters
+LMAX = 24       # Size of progress and I/O counters
 
 if OBSIZE > IBSIZE:
     LBSIZE = int(log2(OBSIZE))
@@ -68,6 +69,45 @@ CopyDistance = (1, 2, 3, 4, 5, 7, 9, 13, 17, 25, 33, 49, 65, 97, 129, 193,
                 12289, 16385, 24577)
 
 ExtraDistanceBits = (0, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13)
+
+out_codes = (
+    0x00c, 0x08c, 0x04c, 0x0cc, 0x02c, 0x0ac, 0x06c, 0x0ec,
+    0x01c, 0x09c, 0x05c, 0x0dc, 0x03c, 0x0bc, 0x07c, 0x0fc,
+    0x002, 0x082, 0x042, 0x0c2, 0x022, 0x0a2, 0x062, 0x0e2,
+    0x012, 0x092, 0x052, 0x0d2, 0x032, 0x0b2, 0x072, 0x0f2,
+    0x00a, 0x08a, 0x04a, 0x0ca, 0x02a, 0x0aa, 0x06a, 0x0ea,
+    0x01a, 0x09a, 0x05a, 0x0da, 0x03a, 0x0ba, 0x07a, 0x0fa,
+    0x006, 0x086, 0x046, 0x0c6, 0x026, 0x0a6, 0x066, 0x0e6,
+    0x016, 0x096, 0x056, 0x0d6, 0x036, 0x0b6, 0x076, 0x0f6,
+    0x00e, 0x08e, 0x04e, 0x0ce, 0x02e, 0x0ae, 0x06e, 0x0ee,
+    0x01e, 0x09e, 0x05e, 0x0de, 0x03e, 0x0be, 0x07e, 0x0fe,
+    0x001, 0x081, 0x041, 0x0c1, 0x021, 0x0a1, 0x061, 0x0e1,
+    0x011, 0x091, 0x051, 0x0d1, 0x031, 0x0b1, 0x071, 0x0f1,
+    0x009, 0x089, 0x049, 0x0c9, 0x029, 0x0a9, 0x069, 0x0e9,
+    0x019, 0x099, 0x059, 0x0d9, 0x039, 0x0b9, 0x079, 0x0f9,
+    0x005, 0x085, 0x045, 0x0c5, 0x025, 0x0a5, 0x065, 0x0e5,
+    0x015, 0x095, 0x055, 0x0d5, 0x035, 0x0b5, 0x075, 0x0f5,
+    0x00d, 0x08d, 0x04d, 0x0cd, 0x02d, 0x0ad, 0x06d, 0x0ed,
+    0x01d, 0x09d, 0x05d, 0x0dd, 0x03d, 0x0bd, 0x07d, 0x0fd,
+    0x013, 0x113, 0x093, 0x193, 0x053, 0x153, 0x0d3, 0x1d3,
+    0x033, 0x133, 0x0b3, 0x1b3, 0x073, 0x173, 0x0f3, 0x1f3,
+    0x00b, 0x10b, 0x08b, 0x18b, 0x04b, 0x14b, 0x0cb, 0x1cb,
+    0x02b, 0x12b, 0x0ab, 0x1ab, 0x06b, 0x16b, 0x0eb, 0x1eb,
+    0x01b, 0x11b, 0x09b, 0x19b, 0x05b, 0x15b, 0x0db, 0x1db,
+    0x03b, 0x13b, 0x0bb, 0x1bb, 0x07b, 0x17b, 0x0fb, 0x1fb,
+    0x007, 0x107, 0x087, 0x187, 0x047, 0x147, 0x0c7, 0x1c7,
+    0x027, 0x127, 0x0a7, 0x1a7, 0x067, 0x167, 0x0e7, 0x1e7,
+    0x017, 0x117, 0x097, 0x197, 0x057, 0x157, 0x0d7, 0x1d7,
+    0x037, 0x137, 0x0b7, 0x1b7, 0x077, 0x177, 0x0f7, 0x1f7,
+    0x00f, 0x10f, 0x08f, 0x18f, 0x04f, 0x14f, 0x0cf, 0x1cf,
+    0x02f, 0x12f, 0x0af, 0x1af, 0x06f, 0x16f, 0x0ef, 0x1ef,
+    0x01f, 0x11f, 0x09f, 0x19f, 0x05f, 0x15f, 0x0df, 0x1df,
+    0x03f, 0x13f, 0x0bf, 0x1bf, 0x07f, 0x17f, 0x0ff, 0x1ff,
+    0x000, 0x040, 0x020, 0x060, 0x010, 0x050, 0x030, 0x070,
+    0x008, 0x048, 0x028, 0x068, 0x018, 0x058, 0x038, 0x078,
+    0x004, 0x044, 0x024, 0x064, 0x014, 0x054, 0x034, 0x074,
+    0x003, 0x083, 0x043, 0x0c3, 0x023, 0x0a3, 0x063, 0x0e3
+)
 
 
 @block
@@ -117,17 +157,18 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
     bitLengthCount = [Signal(intbv()[9:]) for _ in range(MaxCodeLength+1)]
     nextCode = [Signal(intbv()[CODEBITS:]) for _ in range(MaxCodeLength)]
     reverse = Signal(modbv()[CODEBITS:])
-    code_bits = [Signal(intbv()[MaxCodeLength:]) for _ in range(MaxBitLength)]
+    # code_bits = [Signal(intbv()[MaxCodeLength:]) for _ in range(MaxBitLength)]
     distanceLength = [Signal(intbv()[4:]) for _ in range(32)]
 
-    leaves = [Signal(intbv()[CODEBITS + BITBITS:]) for _ in range(4096)]
-    lwaddr = Signal(intbv()[11:])
-    # lraddr = Signal(intbv()[9:])
     if DECOMPRESS:
-        d_leaves = [Signal(intbv()[CODEBITS + BITBITS:]) for _ in range(512)]
+        leaves = [Signal(intbv()[CODEBITS + BITBITS:]) for _ in range(4096)]
+        d_leaves = [Signal(intbv()[9 + BITBITS:]) for _ in range(512)]
     else:
+        leaves = [Signal(bool())]
         d_leaves = [Signal(bool())]
-    # rleaf = Signal(intbv()[CODEBITS + BITBITS:])
+    lwaddr = Signal(intbv()[MaxCodeLength:])
+    lraddr = Signal(intbv()[MaxCodeLength:])
+    rleaf = Signal(intbv()[CODEBITS + BITBITS:])
     wleaf = Signal(intbv()[CODEBITS + BITBITS:])
     leaf = Signal(intbv()[CODEBITS + BITBITS:])
 
@@ -213,12 +254,12 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
     @always(clk.posedge)
     def oramwrite():
         oram[oaddr].next = obyte
-        # leaves[lwaddr].next = wleaf
+        leaves[lwaddr].next = wleaf
 
     @always(clk.posedge)
     def oramread():
         orbyte.next = oram[oraddr]
-        # rleaf.next = leaves[lraddr]
+        rleaf.next = leaves[lraddr]
 
     @block
     def matcher3(o_m, mi):
@@ -531,7 +572,7 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
                         print("Put EOF", do)
                         cs_i = EndOfBlock
                         outlen = codeLength[cs_i]
-                        outbits = code_bits[cs_i]
+                        outbits = out_codes[cs_i] # code_bits[cs_i]
                         print("EOF BITS:", cs_i, outlen, outbits)
                         oaddr.next = do
                         obyte.next = put(outbits, outlen)
@@ -598,7 +639,7 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
                     lencode = length + 254
                     # print("fast:", distance, di, isize, match)
                     outlen = codeLength[lencode]
-                    outbits = code_bits[lencode]
+                    outbits = out_codes[lencode] # code_bits[lencode]
                     # print("BITS:", outlen, outbits)
                     oaddr.next = do
                     obyte.next = put(outbits, outlen)
@@ -777,7 +818,7 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
                         # adv(8)
                         di.next = di + 1
                         outlen = codeLength[bdata]
-                        outbits = code_bits[bdata]
+                        outbits = out_codes[bdata] # code_bits[bdata]
                         # print("CBITS:", bdata, outlen, outbits)
                         oaddr.next = do
                         obyte.next = put(outbits, outlen)
@@ -795,8 +836,11 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
                 for stat_i in range(280, 288):
                     codeLength[stat_i].next = 8
                 numCodeLength.next = 288
-                cur_HF1.next = 0
-                state.next = d_state.HF1
+                if do_compress:
+                    state.next = d_state.CSTATIC
+                else:
+                    cur_HF1.next = 0
+                    state.next = d_state.HF1
 
             elif state == d_state.BL:
 
@@ -921,29 +965,32 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
 
             elif state == d_state.HF1:
 
-                if cur_HF1 < len(bitLengthCount):
-                    bitLengthCount[cur_HF1].next = 0
-                if DECOMPRESS and cur_HF1 < len(d_leaves):
-                    d_leaves[cur_HF1].next = 0
-                if method != 4 and cur_HF1 < len(leaves):
-                    # lwaddr.next = cur_HF1
-                    # wleaf.next = 0
-                    leaves[cur_HF1].next = 0
-                limit = len(leaves)
-                if method == 4:
-                    limit = len(d_leaves)
-                if cur_HF1 < limit:
-                    cur_HF1.next = cur_HF1 + 1
-                else:
-                    print("DID HF1 INIT")
-                    cur_i.next = 0
-                    state.next = d_state.HF1INIT
+                if DECOMPRESS:
+                    if cur_HF1 < len(bitLengthCount):
+                        bitLengthCount[cur_HF1].next = 0
+                    if DECOMPRESS and cur_HF1 < len(d_leaves):
+                        d_leaves[cur_HF1].next = 0
+                    if method != 4 and cur_HF1 < len(leaves):
+                        lwaddr.next = cur_HF1
+                        wleaf.next = 0
+                        # leaves[cur_HF1].next = 0
+                    limit = len(leaves)
+                    if method == 4:
+                        limit = len(d_leaves)
+                    if cur_HF1 < limit:
+                        cur_HF1.next = cur_HF1 + 1
+                    else:
+                        print("DID HF1 INIT")
+                        cur_i.next = 0
+                        state.next = d_state.HF1INIT
 
             elif state == d_state.HF1INIT:
                 # get frequencies of each bit length and ignore 0's
 
                 # print("HF1")
-                if cur_i < numCodeLength:
+                if not DECOMPRESS:
+                    pass
+                elif cur_i < numCodeLength:
                     j = codeLength[cur_i]
                     bitLengthCount[j].next = bitLengthCount[j] + 1
                     # print(cur_i, j, bitLengthCount[j] + 1)
@@ -962,7 +1009,9 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
                 # shortest and longest codes
 
                 # print("HF2")
-                if cur_i <= MaxCodeLength:
+                if not DECOMPRESS:
+                    pass
+                elif cur_i <= MaxCodeLength:
                     if bitLengthCount[cur_i] != 0:
                         if cur_i < minBits:
                             minBits.next = cur_i
@@ -998,36 +1047,40 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
                 # find bit code for first element of each bitLength group
 
                 # print("HF3")
-                amb = maxBits
-                if method == 4:
-                    amb = d_maxBits
-                if cur_i <= amb:
-                    ncode = ((code + bitLengthCount[cur_i - 1]) << 1)
-                    code.next = ncode
-                    nextCode[cur_i].next = ncode
-                    # print(cur_i, ncode)
-                    cur_i.next = cur_i + 1
-                else:
-                    state.next = d_state.HF4
-                    cur_i.next = 0
-                    spread_i.next = 0
-                    print("to HF4")
+                if DECOMPRESS:
+                    amb = maxBits
+                    if method == 4:
+                        amb = d_maxBits
+                    if cur_i <= amb:
+                        ncode = ((code + bitLengthCount[cur_i - 1]) << 1)
+                        code.next = ncode
+                        nextCode[cur_i].next = ncode
+                        # print(cur_i, ncode)
+                        cur_i.next = cur_i + 1
+                    else:
+                        state.next = d_state.HF4
+                        cur_i.next = 0
+                        spread_i.next = 0
+                        print("to HF4")
 
             elif state == d_state.HF4_2:
 
-                canonical = nextCode[bits]
-                nextCode[bits].next = nextCode[bits] + 1
-                if bits > MaxCodeLength:
-                    raise Error("too many bits: %d" % bits)
-                # print(canonical, bits)
-                reverse.next = rev_bits(canonical, bits)
-                # print("LEAF: ", spread_i, bits, reverse, canonical)
-                leaf.next = makeLeaf(spread_i, bits)
-                state.next = d_state.HF4_3
+                if DECOMPRESS:
+                    canonical = nextCode[bits]
+                    nextCode[bits].next = nextCode[bits] + 1
+                    if bits > MaxCodeLength:
+                        raise Error("too many bits: %d" % bits)
+                    # print(canonical, bits)
+                    reverse.next = rev_bits(canonical, bits)
+                    # print("LEAF: ", spread_i, bits, reverse, canonical)
+                    leaf.next = makeLeaf(spread_i, bits)
+                    state.next = d_state.HF4_3
 
             elif state == d_state.HF4_3:
 
-                if method == 4:
+                if not DECOMPRESS:
+                    pass
+                elif method == 4:
                     d_leaves[reverse].next = leaf # makeLeaf(spread_i, bits)
                     if bits <= d_instantMaxBit:
                         if reverse + (1 << bits) <= d_instantMask:
@@ -1041,10 +1094,10 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
                         state.next = d_state.HF4
                         spread_i.next = spread_i + 1
                 else:
-                    # wleaf.next = leaf
-                    # lwaddr.next = reverse
-                    leaves[reverse].next = leaf # makeLeaf(spread_i, bits)
-                    code_bits[spread_i].next = reverse
+                    wleaf.next = leaf
+                    lwaddr.next = reverse
+                    # leaves[reverse].next = leaf # makeLeaf(spread_i, bits)
+                    # code_bits[spread_i].next = reverse
                     if bits <= instantMaxBit:
                         if reverse + (1 << bits) <= instantMask:
                             step.next = 1 << bits
@@ -1060,7 +1113,9 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
             elif state == d_state.HF4:
                 # create binary codes for each literal
 
-                if spread_i < numCodeLength:
+                if not DECOMPRESS:
+                    pass
+                elif spread_i < numCodeLength:
                     bits_next = codeLength[spread_i]
                     if bits_next != 0:
                         bits.next = bits_next
@@ -1087,23 +1142,24 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
 
             elif state == d_state.SPREAD:
 
-                if method == 4 and DECOMPRESS:
-                    # print(spread, spread_i)
-                    d_leaves[spread].next = makeLeaf(
-                        spread_i, codeLength[spread_i])
-                else:
-                    # lwaddr.next = spread
-                    # wleaf.next = makeLeaf(spread_i, codeLength[spread_i])
-                    leaves[spread].next = makeLeaf(spread_i, codeLength[spread_i])
-                # print("SPREAD:", spread, step, instantMask)
-                aim = instantMask
-                if method == 4:
-                    aim = d_instantMask
-                if spread > aim - step:
-                    spread_i.next = spread_i + 1
-                    state.next = d_state.HF4
-                else:
-                    spread.next = spread + step
+                if DECOMPRESS:
+                    if method == 4 and DECOMPRESS:
+                        # print(spread, spread_i)
+                        d_leaves[spread].next = makeLeaf(
+                            spread_i, codeLength[spread_i])
+                    else:
+                        lwaddr.next = spread
+                        wleaf.next = makeLeaf(spread_i, codeLength[spread_i])
+                        # leaves[spread].next = makeLeaf(spread_i, codeLength[spread_i])
+                    # print("SPREAD:", spread, step, instantMask)
+                    aim = instantMask
+                    if method == 4:
+                        aim = d_instantMask
+                    if spread > aim - step:
+                        spread_i.next = spread_i + 1
+                        state.next = d_state.HF4
+                    else:
+                        spread.next = spread + step
 
             elif state == d_state.NEXT:
 
@@ -1117,27 +1173,33 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
                     # print("INIT:", di, dio, instantMaxBit, maxBits)
                     cto = get4(0, maxBits)
                     mask = (1 << instantMaxBit) - 1
-                    # lraddr.next = (cto & mask)
-                    leaf.next = leaves[cto & mask]
+                    lraddr.next = (cto & mask)
+                    # leaf.next = leaves[cto & mask]
+                    filled.next = False
                     cur_next.next = instantMaxBit + 1
                     # print(cur_next, mask, leaf, maxBits)
-                elif get_bits(leaf) >= cur_next:
+                # elif get_bits(leaf) >= cur_next:
+                elif get_bits(rleaf) >= cur_next:
                     print("CACHE MISS")
                     cto = get4(0, maxBits)
                     mask = (1 << cur_next) - 1
-                    # lraddr.next = (cto & mask)
-                    leaf.next = leaves[cto & mask]
+                    lraddr.next = (cto & mask)
+                    # leaf.next = leaves[cto & mask]
+                    filled.next = False
                     cur_next.next = cur_next + 1
                 else:
-                    if get_bits(leaf) < 1:
+                    # if get_bits(leaf) < 1:
+                    if get_bits(rleaf) < 1:
                         print("< 1 bits: ")
                         raise Error("< 1 bits: ")
-                    adv(get_bits(leaf))
+                    #adv(get_bits(leaf))
+                    adv(get_bits(rleaf))
                     """
                     if get_code(leaf) == 0:
                         print("leaf 0", di, isize)
                     """
-                    code.next = get_code(leaf)
+                    #code.next = get_code(leaf)
+                    code.next = get_code(rleaf)
                     # print("ADV:", di, get_bits(leaf), get_code(leaf))
                     if method == 2:
                         state.next = d_state.READBL

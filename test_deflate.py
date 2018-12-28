@@ -79,14 +79,15 @@ class TestDeflate(unittest.TestCase):
             print("START TEST MODE", mode)
             print("==========================")
 
-            b_data, zl_data = test_data(mode, 500)
+            b_data, zl_data = test_data(mode, 1000)
 
-            reset.next = 0
-            tick()
-            yield delay(5)
-            reset.next = 1
-            tick()
-            yield delay(5)
+            if mode == 0:
+                reset.next = 0
+                tick()
+                yield delay(5)
+                reset.next = 1
+                tick()
+                yield delay(5)
 
             if DECOMPRESS:
                 print("==========STREAMING DECOMPRESS TEST=========")

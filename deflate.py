@@ -33,8 +33,8 @@ OBSIZE = 8192   # Size of output buffer (BRAM)
 OBSIZE = 32768  # Size of output buffer for ANY input (BRAM)
 
 # Size of input buffer (LUT-RAM)
-IBSIZE = 16 * CWINDOW  # This size gives method 2 (dynamic tree) for testbench
 IBSIZE = 2 * CWINDOW   # Minimal window
+IBSIZE = 16 * CWINDOW  # This size gives method 2 (dynamic tree) for testbench
 
 LMAX = 24       # Size of progress and I/O counters
 
@@ -610,7 +610,6 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
                     elif cur_cstatic - 3 == isize + 7:
                         print("EOF finish", do)
                         o_done.next = True
-                        # o_oprogress.next = do + 1
                         state.next = d_state.IDLE
                     else:
                         print(cur_cstatic, isize)
@@ -1287,7 +1286,6 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
                         print("New Block!")
                     else:
                         o_done.next = True
-                        o_oprogress.next = do + 1
                         state.next = d_state.IDLE
                 else:
                     if code < EndOfBlock:
@@ -1354,7 +1352,6 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
                     elif not final:
                         state.next = d_state.HEADER
                     else:
-                        o_oprogress.next = do + 1
                         o_done.next = True
                         state.next = d_state.IDLE
                 elif cur_i < length + 2:

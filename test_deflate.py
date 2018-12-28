@@ -79,7 +79,7 @@ class TestDeflate(unittest.TestCase):
             print("START TEST MODE", mode)
             print("==========================")
 
-            b_data, zl_data = test_data(mode, 5000)
+            b_data, zl_data = test_data(mode, 500)
 
             if mode == 0:
                 reset.next = 0
@@ -115,11 +115,15 @@ class TestDeflate(unittest.TestCase):
                 start = now()
                 wait = 0
                 while True:
-                    if ri < o_oprogress - 1: # or o_done:
+                    if ri < o_oprogress:
                         did_read = 1
                         # print("do read", ri, o_oprogress)
                         i_mode.next = READ
                         i_raddr.next = ri
+                        tick()
+                        yield delay(5)
+                        tick()
+                        yield delay(5)
                         tick()
                         yield delay(5)
                         tick()
@@ -152,7 +156,7 @@ class TestDeflate(unittest.TestCase):
 
                     if o_done:
                         # print("DONE", o_oprogress, ri)
-                        if o_oprogress == ri + 1:
+                        if o_oprogress == ri:
                             break;
 
                 i_mode.next = IDLE
@@ -185,11 +189,15 @@ class TestDeflate(unittest.TestCase):
             wait = 0
             start = now()
             while True:
-                if ri < o_oprogress - 1 or o_done:
+                if ri < o_oprogress:
                     did_read = 1
                     # print("do read", ri, o_oprogress)
                     i_mode.next = READ
                     i_raddr.next = ri
+                    tick()
+                    yield delay(5)
+                    tick()
+                    yield delay(5)
                     tick()
                     yield delay(5)
                     tick()

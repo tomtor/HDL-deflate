@@ -143,7 +143,7 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
 
     CodeLengths = 19
     MaxCodeLength = 15
-    InstantMaxBit = 9
+    InstantMaxBit = 10
     EndOfBlock = 256
     MaxBitLength = 288
     # MaxToken = 285
@@ -161,8 +161,8 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
     distanceLength = [Signal(intbv()[4:]) for _ in range(32)]
 
     if DECOMPRESS:
-        leaves = [Signal(intbv()[CODEBITS + BITBITS:]) for _ in range(4096)]
-        d_leaves = [Signal(intbv()[9 + BITBITS:]) for _ in range(512)]
+        leaves = [Signal(intbv()[CODEBITS + BITBITS:]) for _ in range(16384)]
+        d_leaves = [Signal(intbv()[10 + BITBITS:]) for _ in range(1024)]
     else:
         leaves = [Signal(bool())]
         d_leaves = [Signal(bool())]
@@ -190,7 +190,7 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
 
     cur_i = Signal(intbv()[LMAX:])
     spread_i = Signal(intbv()[9:])
-    cur_HF1 = Signal(intbv()[14:])
+    cur_HF1 = Signal(intbv()[MaxCodeLength:])
     cur_static = Signal(intbv()[9:])
     cur_cstatic = Signal(intbv()[LMAX:])
     # cur_search = Signal(intbv(min=-CWINDOW,max=IBSIZE))

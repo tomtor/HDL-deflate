@@ -60,7 +60,7 @@ def test_data(m, tlen=100, limit=False):
         b_data = b_data[:IBSIZE - 4 - 10]
     zl_data = zlib.compress(b_data)
     print("From %d to %d bytes" % (len(b_data), len(zl_data)))
-    print(zl_data)
+    print(zl_data[:500])
     return b_data, zl_data
 
 
@@ -79,7 +79,7 @@ class TestDeflate(unittest.TestCase):
             print("START TEST MODE", mode)
             print("==========================")
 
-            b_data, zl_data = test_data(mode, 1000)
+            b_data, zl_data = test_data(mode, 5000)
 
             if mode == 0:
                 reset.next = 0
@@ -165,6 +165,7 @@ class TestDeflate(unittest.TestCase):
                       (now() - start) // 10, wait)
                 sresult = b''.join(sresult)
                 self.assertEqual(b_data, sresult)
+                # self.assertEqual(b_data[:100000], sresult[:100000])
                 print("Decompress OK!")
 
             print("==========STREAMING COMPRESS TEST=========")
@@ -179,7 +180,7 @@ class TestDeflate(unittest.TestCase):
             print("WRITE")
             i = 0
             ri = 0
-            slen = 500
+            slen = 5000
             sresult = []
             wait = 0
             start = now()

@@ -20,7 +20,7 @@ Usage should be clear from the test bench in `test_deflate.py`.
 
 One can use a sliding window to reduce the size of the input buffer and the LUT-usage.
 
-The minimal value is 2 * CWINDOW (64 bytes), the first decompression in the UnitTest in `test_deflate.py`
+The minimal value is 2 * CWINDOW (64 bytes), the UnitTest in `test_deflate.py`
 uses this strategy.
 
 By default the compressor will reduce repeated 3/4/5 byte sequences in the search window to 15 bit.
@@ -104,7 +104,6 @@ BRAM	|4
 ## Speed
 
 The Vivado timing report fails at 100Mhz, but the test bench runs fine on my Arty at 100Mhz.
-`MATCH10` causes the most delays.
 
 # Future Improvements (when there is interest)
 

@@ -79,7 +79,7 @@ class TestDeflate(unittest.TestCase):
             print("START TEST MODE", mode)
             print("==========================")
 
-            b_data, zl_data = test_data(mode, 500)
+            b_data, zl_data = test_data(mode, 15000)
 
             if mode == 0:
                 reset.next = 0
@@ -251,7 +251,7 @@ class TestDeflate(unittest.TestCase):
         o_iprogress = Signal(intbv()[LMAX:])
         o_oprogress = Signal(intbv()[LMAX:])
         i_waddr = Signal(modbv()[LMAX:])
-        i_raddr = Signal(modbv()[LBSIZE:])
+        i_raddr = Signal(modbv()[LMAX:])
 
         clk = Signal(bool(0))
         reset = ResetSignal(1, 0, True)

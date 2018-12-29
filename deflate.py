@@ -32,11 +32,15 @@ CWINDOW = 32    # Search window for compression
 OBSIZE = 8192   # Size of output buffer (BRAM)
 OBSIZE = 32768  # Size of output buffer for ANY input (BRAM)
 
+# HOLD output to avoid overwriting unread output
+HOLD = OBSIZE - OBSIZE // 128 + 1  # OBSIZE // 2
+
 # Size of input buffer (LUT-RAM)
 IBSIZE = 2 * CWINDOW   # Minimal window
 IBSIZE = 16 * CWINDOW  # This size gives method 2 (dynamic tree) for testbench
 
 LMAX = 24       # Size of progress and I/O counters
+
 
 if OBSIZE > IBSIZE:
     LBSIZE = int(log2(OBSIZE))
@@ -123,8 +127,8 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
     iram = [Signal(intbv()[8:]) for _ in range(IBSIZE)]
     oram = [Signal(intbv()[8:]) for _ in range(OBSIZE)]
 
-    oaddr = Signal(modbv()[LBSIZE:])
-    oraddr = Signal(modbv()[LBSIZE:])
+    oaddr = Signal(modbv()[LOBSIZE:])
+    oraddr = Signal(modbv()[LOBSIZE:])
     obyte = Signal(intbv()[8:])
     orbyte = Signal(intbv()[8:])
 
@@ -162,7 +166,7 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
 
     if DECOMPRESS:
         leaves = [Signal(intbv()[CODEBITS + BITBITS:]) for _ in range(16384)]
-        d_leaves = [Signal(intbv()[10 + BITBITS:]) for _ in range(1024)]
+        d_leaves = [Signal(intbv()[10 + BITBITS:]) for _ in range(2048)]
     else:
         leaves = [Signal(bool())]
         d_leaves = [Signal(bool())]
@@ -199,8 +203,8 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
     cur_next = Signal(intbv()[4:])
     # cur_next = Signal(bool())
 
-    length = Signal(intbv()[LBSIZE:])
-    offset = Signal(modbv()[LBSIZE:])
+    length = Signal(modbv()[LOBSIZE:])
+    offset = Signal(intbv()[LOBSIZE:])
 
     di = Signal(modbv()[LMAX:])
     old_di = Signal(intbv()[LMAX:])
@@ -1242,12 +1246,15 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
                     # print("mored:", mored)
                     distance += mored
                     # print("distance more:", distance, do, di, isize)
+                    if distance >= HOLD:
+                        print(distance)
+                        raise Error("distance too big (> HOLD)")
                     if distance > do:
                         raise Error("distance too big")
                     adv(moreBits + extraLength + get_bits(leaf))
                     # print("offset:", do - distance)
                     # print("FAIL?: ", di, dio, do, b1, b2, b3, b4)
-                    offset.next = do - distance
+                    offset.next = (do - distance) & OBS
                     length.next = tlength
                     # cur_next.next = 0
                     cur_i.next = 0
@@ -1265,6 +1272,9 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
                     pass  # fetch more bytes
                 elif di >= isize - 4 and not i_mode == IDLE:
                     pass  # fetch more bytes
+                elif do >= i_raddr + OBSIZE:
+                    print("HOLDB")
+                    pass
                 elif di > isize - 3:  # checksum is 4 bytes
                     state.next = d_state.IDLE
                     o_done.next = True
@@ -1329,11 +1339,14 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
                     filled.next = True
                 elif nb < 4:
                     pass
+                elif cur_i == 0 and do >= i_raddr + HOLD:
+                    # print("HOLDW", length, offset, cur_i, do, i_raddr)
+                    pass
+                elif di >= isize - 2:
+                    print("HOLD2")
+                    pass
                 elif method == 0:
-                    if di >= isize - 2:
-                        # print("HOLD")
-                        pass
-                    elif cur_i < length:
+                    if cur_i < length:
                         oaddr.next = do
                         obyte.next = b3
                         adv(8)

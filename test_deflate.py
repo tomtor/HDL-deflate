@@ -124,10 +124,6 @@ class TestDeflate(unittest.TestCase):
                         yield delay(5)
                         tick()
                         yield delay(5)
-                        tick()
-                        yield delay(5)
-                        tick()
-                        yield delay(5)
                         ri = ri + 1
                     else:
                         did_read = 0
@@ -194,10 +190,6 @@ class TestDeflate(unittest.TestCase):
                     # print("do read", ri, o_oprogress)
                     i_mode.next = READ
                     i_raddr.next = ri
-                    tick()
-                    yield delay(5)
-                    tick()
-                    yield delay(5)
                     tick()
                     yield delay(5)
                     tick()

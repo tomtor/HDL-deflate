@@ -416,20 +416,11 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
 
     @always(clk.posedge)
     def io_logic():
+        o_byte.next = oram[i_raddr & OBS]
         if i_mode == WRITE:
-
             # print("WRITE:", i_addr, i_data)
             iram[i_waddr & IBS].next = i_data
             isize.next = i_waddr
-
-        elif i_mode == READ:
-
-            # o_data.next = oram[i_addr]
-            # oraddr.next = i_addr
-            o_byte.next = oram[i_raddr]
-
-        else:
-            pass
 
     @always(clk.posedge)
     def logic():

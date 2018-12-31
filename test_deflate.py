@@ -79,7 +79,7 @@ class TestDeflate(unittest.TestCase):
             print("START TEST MODE", mode)
             print("==========================")
 
-            b_data, zl_data = test_data(mode, 250000)
+            b_data, zl_data = test_data(mode, 25000)
 
             if mode == 0:
                 reset.next = 0
@@ -182,7 +182,7 @@ class TestDeflate(unittest.TestCase):
             print("WRITE")
             i = 0
             ri = 0
-            slen = 250000
+            slen = 25000
             sresult = []
             wait = 0
             start = now()
@@ -241,8 +241,8 @@ class TestDeflate(unittest.TestCase):
 
 
         for loop in range(1):
-            for mode in range(5):
-            # for mode in range(3,5):
+            # for mode in range(5):
+            for mode in range(2,3):
                 self.runTests(test_decompress)
 
     def runTests(self, test):

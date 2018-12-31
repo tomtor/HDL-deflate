@@ -30,15 +30,7 @@ FAST = True
 CWINDOW = 32    # Search window for compression
 
 OBSIZE = 8192   # Size of output buffer (BRAM)
-OBSIZE = 65536  # Size of output buffer for ANY input (BRAM)
 OBSIZE = 32768  # Size of output buffer for ANY input (BRAM)
-
-# HOLD output to avoid overwriting unread output
-if OBSIZE <= 32768:
-    # HOLD = OBSIZE - OBSIZE // 2048 + 1
-    HOLD = OBSIZE - 8
-else:
-    HOLD = (OBSIZE // 4) - 1  # For OBSIZE = 65536
 
 # Size of input buffer (LUT-RAM)
 IBSIZE = 16 * CWINDOW  # This size gives method 2 (dynamic tree) for testbench
@@ -171,10 +163,10 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
     distanceLength = [Signal(intbv()[4:]) for _ in range(32)]
 
     if DECOMPRESS:
-        #leaves = [Signal(intbv()[CODEBITS + BITBITS:]) for _ in range(16384)]
-        leaves = [Signal(intbv()[CODEBITS + BITBITS:]) for _ in range(32768)]
-        #d_leaves = [Signal(intbv()[CODEBITS + BITBITS:]) for _ in range(4096)]
-        d_leaves = [Signal(intbv()[CODEBITS + BITBITS:]) for _ in range(32768)]
+        leaves = [Signal(intbv()[CODEBITS + BITBITS:]) for _ in range(16384)]
+        # leaves = [Signal(intbv()[CODEBITS + BITBITS:]) for _ in range(32768)]
+        d_leaves = [Signal(intbv()[CODEBITS + BITBITS:]) for _ in range(4096)]
+        # d_leaves = [Signal(intbv()[CODEBITS + BITBITS:]) for _ in range(32768)]
     else:
         leaves = [Signal(bool())]
         d_leaves = [Signal(bool())]
@@ -1182,7 +1174,7 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
                     # print(cur_next, mask, leaf, maxBits)
                 # elif get_bits(leaf) >= cur_next:
                 elif get_bits(rleaf) >= cur_next:
-                    print("CACHE MISS")
+                    print("CACHE MISS", cur_next)
                     cto = get4(0, maxBits)
                     mask = (1 << cur_next) - 1
                     lraddr.next = (cto & mask)
@@ -1231,7 +1223,7 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
                     # state.next = d_state.D_NEXT_2
                     cur_next.next = instantMaxBit + 1
                 elif get_bits(leaf) >= cur_next:
-                    print("DCACHE MISS!!!", cur_next)
+                    print("DCACHE MISS", cur_next)
                     token = code - 257
                     # print("token: ", token)
                     extraLength = ExtraLengthBits[token]
@@ -1266,9 +1258,6 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
                     # print("mored:", mored)
                     distance += mored
                     # print("distance more:", distance, do, di, isize)
-                    if distance >= HOLD and OBSIZE != 65536:
-                        print(distance)
-                        raise Error("distance too big (> HOLD)")
                     if distance > do:
                         print(distance, do)
                         raise Error("distance too big")
@@ -1293,8 +1282,8 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
                     pass  # fetch more bytes
                 elif di >= isize - 4 and not i_mode == IDLE:
                     pass  # fetch more bytes
-                elif do >= i_raddr + OBSIZE - 10:
-                    print("HOLDB")
+                elif do >= i_raddr + OBSIZE: # - 10:
+                    # print("HOLDB")
                     # filled.next = False
                     pass
                 elif di > isize - 3:  # checksum is 4 bytes
@@ -1362,8 +1351,7 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
                     filled.next = True
                 elif nb < 4:
                     pass
-                # elif cur_i == 0 and do >= i_raddr + HOLD - 10:
-                elif cur_i == 0 and do + length >= i_raddr + OBSIZE - 10:
+                elif cur_i == 0 and do + length >= i_raddr + OBSIZE: # - 10:
                     # print("HOLDW", length, offset, cur_i, do, i_raddr)
                     pass
                 elif di >= isize - 2:

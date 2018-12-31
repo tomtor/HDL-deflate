@@ -21,6 +21,9 @@ COMPRESS = True
 DECOMPRESS = False
 DECOMPRESS = True
 
+DYNAMIC = False
+DYNAMIC = True
+
 MATCH10 = False
 MATCH10 = True
 
@@ -165,7 +168,10 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
     if DECOMPRESS:
         leaves = [Signal(intbv()[CODEBITS + BITBITS:]) for _ in range(16384)]
         # leaves = [Signal(intbv()[CODEBITS + BITBITS:]) for _ in range(32768)]
-        d_leaves = [Signal(intbv()[CODEBITS + BITBITS:]) for _ in range(4096)]
+        if DYNAMIC:
+            d_leaves = [Signal(intbv()[CODEBITS + BITBITS:]) for _ in range(4096)]
+        else:
+            d_leaves = [Signal(bool())]
         # d_leaves = [Signal(intbv()[CODEBITS + BITBITS:]) for _ in range(32768)]
     else:
         leaves = [Signal(bool())]
@@ -500,6 +506,9 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
                     print("method", hm)
                     # print(di, dio, nb, b1, b2, b3, b4, hm, isize)
                     if hm == 2:
+                        if not DYNAMIC:
+                            print("dynamic tree mode disabled")
+                            raise Error("dynamic tree mode disabled")
                         state.next = d_state.BL
                         numCodeLength.next = 0
                         numLiterals.next = 0
@@ -838,7 +847,7 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
 
             elif state == d_state.BL:
 
-                if not DECOMPRESS:
+                if not DECOMPRESS or not DYNAMIC:
                     pass
                 elif not filled:
                     filled.next = True
@@ -872,7 +881,7 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
 
             elif state == d_state.READBL:
 
-                if not DECOMPRESS:
+                if not DECOMPRESS or not DYNAMIC:
                     pass
                 elif not filled:
                     filled.next = True
@@ -933,7 +942,7 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
 
             elif state == d_state.DISTTREE:
 
-                if DECOMPRESS:
+                if DECOMPRESS and DYNAMIC:
                     print("DISTTREE")
                     for dist_i in range(32):
                         codeLength[dist_i].next = distanceLength[dist_i]
@@ -962,14 +971,14 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
                 if DECOMPRESS:
                     if cur_HF1 < len(bitLengthCount):
                         bitLengthCount[cur_HF1].next = 0
-                    if cur_HF1 < len(d_leaves):
+                    if cur_HF1 < len(d_leaves) and DYNAMIC:
                         d_leaves[cur_HF1].next = 0
                     if method != 4 and cur_HF1 < len(leaves):
                         lwaddr.next = cur_HF1
                         wleaf.next = 0
                         # leaves[cur_HF1].next = 0
                     limit = len(leaves)
-                    if method == 4:
+                    if method == 4 and DYNAMIC:
                         limit = len(d_leaves)
                     if cur_HF1 < limit:
                         cur_HF1.next = cur_HF1 + 1
@@ -1019,7 +1028,7 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
                 else:
                     print(minBits, maxBits)
                     t = InstantMaxBit
-                    if method == 4:
+                    if method == 4 and DYNAMIC:
                         if t > int(d_maxBits):
                             t = int(d_maxBits)
                         d_instantMaxBit.next = t
@@ -1043,7 +1052,7 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
                 # print("HF3")
                 if DECOMPRESS:
                     amb = maxBits
-                    if method == 4:
+                    if method == 4 and DYNAMIC:
                         amb = d_maxBits
                     if cur_i <= amb:
                         ncode = ((code + bitLengthCount[cur_i - 1]) << 1)
@@ -1074,7 +1083,7 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
 
                 if not DECOMPRESS:
                     pass
-                elif method == 4:
+                elif method == 4 and DYNAMIC:
                     d_leaves[reverse].next = leaf # makeLeaf(spread_i, bits)
                     if bits <= d_instantMaxBit:
                         if reverse + (1 << bits) <= d_instantMask:
@@ -1121,12 +1130,12 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
                     if do_compress:
                         state.next = d_state.CSTATIC
                         cur_cstatic.next = 0
-                    elif method == 3:
+                    elif method == 3 and DYNAMIC:
                         state.next = d_state.DISTTREE
-                    elif method == 4:
+                    elif method == 4 and DYNAMIC:
                         print("DEFLATE m2!")
                         state.next = d_state.NEXT
-                    elif method == 2:
+                    elif method == 2 and DYNAMIC:
                         numCodeLength.next = 0
                         state.next = d_state.NEXT
                     else:
@@ -1137,7 +1146,7 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
             elif state == d_state.SPREAD:
 
                 if DECOMPRESS:
-                    if method == 4 and DECOMPRESS:
+                    if method == 4 and DYNAMIC:
                         # print(spread, spread_i)
                         d_leaves[spread].next = makeLeaf(
                             spread_i, codeLength[spread_i])
@@ -1147,7 +1156,7 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
                         # leaves[spread].next = makeLeaf(spread_i, codeLength[spread_i])
                     # print("SPREAD:", spread, step, instantMask)
                     aim = instantMask
-                    if method == 4:
+                    if method == 4 and DYNAMIC:
                         aim = d_instantMask
                     if spread > aim - step:
                         spread_i.next = spread_i + 1
@@ -1195,14 +1204,14 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
                     #code.next = get_code(leaf)
                     code.next = get_code(rleaf)
                     # print("ADV:", di, get_bits(leaf), get_code(leaf))
-                    if method == 2:
+                    if method == 2 and DYNAMIC:
                         state.next = d_state.READBL
                     else:
                         state.next = d_state.INFLATE
 
             elif state == d_state.D_NEXT:
 
-                if not DECOMPRESS:
+                if not DECOMPRESS or not DYNAMIC:
                     pass
                 elif not filled:
                     filled.next = True
@@ -1236,7 +1245,7 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
 
             elif state == d_state.D_NEXT_2:
 
-                if DECOMPRESS:
+                if DECOMPRESS and DYNAMIC:
                     if get_bits(leaf) == 0:
                         raise Error("0 bits")
                     token = code - 257
@@ -1339,7 +1348,9 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
                             oraddr.next = do - distance
                             state.next = d_state.COPY
                         else:
-                            # raise Error("TO DO")
+                            if not DYNAMIC:
+                                print("DYNAMIC mode disabled")
+                                raise Error("DYNAMIC mode disabled")
                             state.next = d_state.D_NEXT
                     cur_next.next = 0
 
@@ -1384,13 +1395,11 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
                     if cur_i > 1:
                         # Special 1 byte offset handling:
                         if (offset + cur_i) & OBS == (do + 1) & OBS:
-                            print("C1", do)
                             obyte.next = copy1
                         elif cur_i == 3 or (offset + cur_i) & OBS != do & OBS:
                             obyte.next = orbyte
                         # Special 2 byte offset handling:
                         elif cur_i > 2:
-                            print("C2", do)
                             if cur_i & 1:
                                 obyte.next = copy2
                             else:

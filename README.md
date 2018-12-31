@@ -37,6 +37,10 @@ better to use a more dense coding in your FPGA application data in the first pla
 The compress mode can be disabled by setting `COMPRESS` to `False`.
 
 The decompress mode can be disabled by setting `DECOMPRESS` to `False`.
+As an option you can disable dynamic tree decompression by setting `DYNAMIC` to `False`. 
+This will save a lot of LUT-ram and HDL-Deflate compressed output is always using a static tree,
+but zlib will normally generate dynamic trees.
+
 FAST MATCH10 compress only has quite good resource usage.
 
 ## Compression speed

@@ -31,13 +31,18 @@ CWINDOW = 32    # Search window for compression
 
 OBSIZE = 8192   # Size of output buffer (BRAM)
 OBSIZE = 32768  # Size of output buffer for ANY input (BRAM)
+OBSIZE = 65536  # Size of output buffer for ANY input (BRAM)
 
 # HOLD output to avoid overwriting unread output
-HOLD = OBSIZE - OBSIZE // 128 + 1  # OBSIZE // 2
+if OBSIZE <= 32768:
+    # HOLD = OBSIZE - OBSIZE // 2048 + 1
+    HOLD = OBSIZE - 8
+else:
+    HOLD = (OBSIZE // 4) - 1  # For OBSIZE = 65536
 
 # Size of input buffer (LUT-RAM)
-IBSIZE = 2 * CWINDOW   # Minimal window
 IBSIZE = 16 * CWINDOW  # This size gives method 2 (dynamic tree) for testbench
+IBSIZE = 2 * CWINDOW   # Minimal window
 
 LMAX = 24       # Size of progress and I/O counters
 
@@ -138,6 +143,7 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
     state = Signal(d_state.IDLE)
     method = Signal(intbv()[3:])
     final = Signal(bool())
+    wtick = Signal(bool())
     do_compress = Signal(bool())
 
     numLiterals = Signal(intbv()[9:])
@@ -159,14 +165,14 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
     codeLength = [Signal(intbv()[4:]) for _ in range(MaxBitLength+32)]
     bits = Signal(intbv()[4:])
     bitLengthCount = [Signal(intbv()[9:]) for _ in range(MaxCodeLength+1)]
-    nextCode = [Signal(intbv()[CODEBITS:]) for _ in range(MaxCodeLength)]
+    nextCode = [Signal(intbv()[CODEBITS:]) for _ in range(MaxCodeLength+1)]
     reverse = Signal(modbv()[CODEBITS:])
     # code_bits = [Signal(intbv()[MaxCodeLength:]) for _ in range(MaxBitLength)]
     distanceLength = [Signal(intbv()[4:]) for _ in range(32)]
 
     if DECOMPRESS:
         leaves = [Signal(intbv()[CODEBITS + BITBITS:]) for _ in range(16384)]
-        d_leaves = [Signal(intbv()[10 + BITBITS:]) for _ in range(2048)]
+        d_leaves = [Signal(intbv()[CODEBITS + BITBITS:]) for _ in range(4096)]
     else:
         leaves = [Signal(bool())]
         d_leaves = [Signal(bool())]
@@ -302,7 +308,7 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
                 if do_compress:
                     print("FILL", di, old_di, nb, b1, b2, b3, b4)
                 """
-                if FAST:  #  and do_compress:
+                if FAST:  # and do_compress:
                     shift = (di - old_di) * 8
                     """
                     if shift != 0:
@@ -554,7 +560,7 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
                     obyte.next = put(0x3, 3)
                     put_adv(0x3, 3)
                 elif flush:
-                    print("flush", do, ob1)
+                    # print("flush", do, ob1)
                     no_adv = 1
                     oaddr.next = do
                     obyte.next = ob1
@@ -719,7 +725,7 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
                                                 match = 10
 
                     # distance = di - cur_search
-                    print("d/l", di, distance, match)
+                    # print("d/l", di, distance, match)
                     cur_dist.next = distance
                     cur_i.next = 1024
                     # adv(match * 8)
@@ -1246,7 +1252,7 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
                     # print("mored:", mored)
                     distance += mored
                     # print("distance more:", distance, do, di, isize)
-                    if distance >= HOLD:
+                    if distance >= HOLD and OBSIZE != 65536:
                         print(distance)
                         raise Error("distance too big (> HOLD)")
                     if distance > do:
@@ -1272,8 +1278,9 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
                     pass  # fetch more bytes
                 elif di >= isize - 4 and not i_mode == IDLE:
                     pass  # fetch more bytes
-                elif do >= i_raddr + OBSIZE:
+                elif do >= i_raddr + OBSIZE - 4:
                     print("HOLDB")
+                    # filled.next = False
                     pass
                 elif di > isize - 3:  # checksum is 4 bytes
                     state.next = d_state.IDLE
@@ -1284,6 +1291,7 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
                     print("EOF:", di, do)
                     if not final:
                         state.next = d_state.HEADER
+                        filled.next = False
                         print("New Block!")
                     else:
                         o_done.next = True
@@ -1340,10 +1348,11 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
                 elif nb < 4:
                     pass
                 elif cur_i == 0 and do >= i_raddr + HOLD:
+                # elif cur_i == 0 and do + length >= i_raddr + OBSIZE - 10:
                     # print("HOLDW", length, offset, cur_i, do, i_raddr)
                     pass
                 elif di >= isize - 2:
-                    print("HOLD2")
+                    # print("HOLD2")
                     pass
                 elif method == 0:
                     if cur_i < length:
@@ -1354,7 +1363,10 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
                         do.next = do + 1
                         o_oprogress.next = do + 1
                     elif not final:
+                        adv(16)
                         state.next = d_state.HEADER
+                        filled.next = False
+                        print("new block")
                     else:
                         o_done.next = True
                         state.next = d_state.IDLE

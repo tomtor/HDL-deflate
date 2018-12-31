@@ -79,7 +79,7 @@ class TestDeflate(unittest.TestCase):
             print("START TEST MODE", mode)
             print("==========================")
 
-            b_data, zl_data = test_data(mode, 15000)
+            b_data, zl_data = test_data(mode, 250000)
 
             if mode == 0:
                 reset.next = 0
@@ -115,6 +115,8 @@ class TestDeflate(unittest.TestCase):
                 start = now()
                 wait = 0
                 while True:
+                    if ri >= 1000 and ri % 10000 == 0:
+                        print(ri)
                     if ri < o_oprogress:
                         did_read = 1
                         # print("do read", ri, o_oprogress)
@@ -180,7 +182,7 @@ class TestDeflate(unittest.TestCase):
             print("WRITE")
             i = 0
             ri = 0
-            slen = 5000
+            slen = 250000
             sresult = []
             wait = 0
             start = now()
@@ -194,6 +196,8 @@ class TestDeflate(unittest.TestCase):
                     yield delay(5)
                     tick()
                     yield delay(5)
+                    if ri % 10000 == 0:
+                        print(ri)
                     ri = ri + 1
                 else:
                     did_read = 0
@@ -238,6 +242,7 @@ class TestDeflate(unittest.TestCase):
 
         for loop in range(1):
             for mode in range(5):
+            # for mode in range(3,5):
                 self.runTests(test_decompress)
 
     def runTests(self, test):

@@ -303,11 +303,6 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
         if not reset:
             print("FILL RESET")
             nb.next = 0
-            # b1.next = 0
-            # b2.next = 0
-            # b3.next = 0
-            # b4.next = 0
-            # old_di.next = 0
         else:
             if isize < 4:
                 nb.next = 0
@@ -554,6 +549,8 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
                 elif not filled:
                     no_adv = 1
                     filled.next = True
+                elif not nb:
+                    no_adv = 1
                 elif cur_cstatic == 0:
                     flush.next = False
                     ob1.next = 0

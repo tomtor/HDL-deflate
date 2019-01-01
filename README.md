@@ -34,24 +34,40 @@ Another strategy for data sets with just a small set of used byte values would b
 to use a dedicated pre-computed Huffman tree. I could add this if there is interest, but it is probably
 better to use a more dense coding in your FPGA application data in the first place.
 
-The compress mode can be disabled by setting `COMPRESS` to `False`.
-
-The decompress mode can be disabled by setting `DECOMPRESS` to `False`.
-As an option you can disable dynamic tree decompression by setting `DYNAMIC` to `False`. 
-This will save a lot of LUT-ram and HDL-Deflate compressed output is always using a static tree,
-but zlib will normally generate dynamic trees.
-
-FAST MATCH10 compress only has quite good resource usage.
-
 ## Compression speed
 
 To reduce LUT usage the original implementation matched each slot in the search window in a dedicated clock cycle.
 By setting `FAST` to `True` it will generate the logic to match the whole window in a single cycle.
 The effective speed will be around 1 input byte every two cycles.
 
+## Disabling functionality to save LUTs
+
+The compress mode can be disabled by setting `COMPRESS` to `False`.
+
+The decompress mode can be disabled by setting `DECOMPRESS` to `False`.
+
+As an option you can disable dynamic tree decompression by setting `DYNAMIC` to `False`. 
+This will save a lot of LUT-ram and HDL-Deflate compressed output is always using a static tree,
+but zlib will normally generate dynamic trees. Set zlib option `Z_FIXED` to generate streams with
+a static tree.
+
+In general the size of `leaves` and `d_leaves` can be reduced a lot when the maximal length of the input stream
+is less than 32768. One can replace `test_data()` in `test_deflate.py` with a specific version which generates
+typical test data for the intended FPGA application, and repeatedly halve the sizes of the `leaves` arrays
+until the test fails.
+
+FAST MATCH10 compress only has quite good resource usage.
+
+## Practical considerations
+
+In general HDL-Deflate is interesting when speed is important. When speed is not a real issue using a (soft)
+CPU with zlib is probably the better approach. Especially decompression is also quite fast with a CPU and HDL-Deflate
+needs a lot of LUTs when configured to decompress ANY deflate input stream. Compression is another story because it
+is a LOT faster in hardware with the `FAST` option and uses a reasonable amount of LUTs.
+
 # FPGA validation
 
-## Minimal
+## Minimal with smaller leaves arrays
 
 Resource|Estimation
 --------|----------
@@ -60,7 +76,7 @@ LUTRAM	|800
 FF	|2265
 BRAM	|4
 
-## Compress False
+## Compress False and smaller leaves arrays
 
 Resource|Estimation
 --------|----------
@@ -77,15 +93,6 @@ LUT	|5118
 LUTRAM	|84
 FF	|1577
 BRAM	|2
-
-## MATCH10
-
-Resource|Estimation
---------|----------
-LUT	|12073
-LUTRAM	|488
-FF	|3316
-BRAM	|4
 
 ## FAST
 

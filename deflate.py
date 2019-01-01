@@ -166,12 +166,13 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
     distanceLength = [Signal(intbv()[4:]) for _ in range(32)]
 
     if DECOMPRESS:
-        leaves = [Signal(intbv()[CODEBITS + BITBITS:]) for _ in range(16384)]
-        # leaves = [Signal(intbv()[CODEBITS + BITBITS:]) for _ in range(32768)]
         if DYNAMIC:
+            leaves = [Signal(intbv()[CODEBITS + BITBITS:]) for _ in range(16384)]
             d_leaves = [Signal(intbv()[CODEBITS + BITBITS:]) for _ in range(4096)]
         else:
+            leaves = [Signal(intbv()[CODEBITS + BITBITS:]) for _ in range(512)]
             d_leaves = [Signal(bool())]
+        # leaves = [Signal(intbv()[CODEBITS + BITBITS:]) for _ in range(32768)]
         # d_leaves = [Signal(intbv()[CODEBITS + BITBITS:]) for _ in range(32768)]
     else:
         leaves = [Signal(bool())]

@@ -177,10 +177,17 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
     else:
         leaves = [Signal(bool())]
         d_leaves = [Signal(bool())]
+
     lwaddr = Signal(intbv()[MaxCodeLength:])
     lraddr = Signal(intbv()[MaxCodeLength:])
     rleaf = Signal(intbv()[CODEBITS + BITBITS:])
     wleaf = Signal(intbv()[CODEBITS + BITBITS:])
+
+    dlwaddr = Signal(intbv()[MaxCodeLength:])
+    dlraddr = Signal(intbv()[MaxCodeLength:])
+    drleaf = Signal(intbv()[CODEBITS + BITBITS:])
+    dwleaf = Signal(intbv()[CODEBITS + BITBITS:])
+
     leaf = Signal(intbv()[CODEBITS + BITBITS:])
 
     minBits = Signal(intbv()[5:])
@@ -265,14 +272,16 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
 
 
     @always(clk.posedge)
-    def oramwrite():
+    def bramwrite():
         oram[oaddr].next = obyte
         leaves[lwaddr].next = wleaf
+        d_leaves[dlwaddr].next = dwleaf
 
     @always(clk.posedge)
-    def oramread():
+    def bramread():
         orbyte.next = oram[oraddr]
         rleaf.next = leaves[lraddr]
+        drleaf.next = d_leaves[dlraddr]
 
     @block
     def matcher3(o_m, mi):
@@ -965,7 +974,9 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
                     if cur_HF1 < len(bitLengthCount):
                         bitLengthCount[cur_HF1].next = 0
                     if cur_HF1 < len(d_leaves) and DYNAMIC:
-                        d_leaves[cur_HF1].next = 0
+                        dlwaddr.next = cur_HF1
+                        dwleaf.next = 0
+                        # d_leaves[cur_HF1].next = 0
                     if method != 4 and cur_HF1 < len(leaves):
                         lwaddr.next = cur_HF1
                         wleaf.next = 0
@@ -1077,7 +1088,9 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
                 if not DECOMPRESS:
                     pass
                 elif method == 4 and DYNAMIC:
-                    d_leaves[reverse].next = leaf # makeLeaf(spread_i, bits)
+                    dwleaf.next = leaf
+                    dlwaddr.next = reverse
+                    # d_leaves[reverse].next = leaf
                     if bits <= d_instantMaxBit:
                         if reverse + (1 << bits) <= d_instantMask:
                             step.next = 1 << bits
@@ -1141,8 +1154,9 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
                 if DECOMPRESS:
                     if method == 4 and DYNAMIC:
                         # print(spread, spread_i)
-                        d_leaves[spread].next = makeLeaf(
-                            spread_i, codeLength[spread_i])
+                        dlwaddr.next = spread
+                        dwleaf.next = makeLeaf(spread_i, codeLength[spread_i])
+                        # d_leaves[spread].next = makeLeaf(spread_i, codeLength[spread_i])
                     else:
                         lwaddr.next = spread
                         wleaf.next = makeLeaf(spread_i, codeLength[spread_i])
@@ -1217,17 +1231,20 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
                     # print("d_maxBits", d_maxBits, d_instantMaxBit)
                     cto = get4(extraLength, d_maxBits)
                     mask = (1 << d_instantMaxBit) - 1
-                    leaf.next = d_leaves[cto & mask]
-                    # state.next = d_state.D_NEXT_2
+                    dlraddr.next = (cto & mask)
+                    filled.next = False
+                    # leaf.next = d_leaves[cto & mask]
                     cur_next.next = instantMaxBit + 1
-                elif get_bits(leaf) >= cur_next:
+                elif get_bits(drleaf) >= cur_next:
                     print("DCACHE MISS", cur_next)
                     token = code - 257
                     # print("token: ", token)
                     extraLength = ExtraLengthBits[token]
                     cto = get4(extraLength, d_maxBits)
                     mask = (1 << cur_next) - 1
-                    leaf.next = d_leaves[cto & mask]
+                    dlraddr.next = (cto & mask)
+                    filled.next = False
+                    # leaf.next = d_leaves[cto & mask]
                     cur_next.next = cur_next + 1
                 else:
                     state.next = d_state.D_NEXT_2
@@ -1235,31 +1252,31 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
             elif state == d_state.D_NEXT_2:
 
                 if DECOMPRESS and DYNAMIC:
-                    if get_bits(leaf) == 0:
+                    if get_bits(drleaf) == 0:
                         raise Error("0 bits")
                     token = code - 257
-                    # print("E2:", token, leaf)
+                    # print("E2:", token, drleaf)
                     tlength = CopyLength[token]
                     # print("tlength:", tlength)
                     extraLength = ExtraLengthBits[token]
                     # print("extra length bits:", extraLength)
                     tlength += get4(0, extraLength)
                     # print("extra length:", tlength)
-                    distanceCode = get_code(leaf)
+                    distanceCode = get_code(drleaf)
                     # print("distance code:", distanceCode)
                     distance = CopyDistance[distanceCode]
                     # print("distance:", distance)
                     moreBits = ExtraDistanceBits[distanceCode >> 1]
                     # print("more bits:", moreBits)
-                    # print("bits:", get_bits(leaf))
-                    mored = get4(extraLength + get_bits(leaf), moreBits)
+                    # print("bits:", get_bits(drleaf))
+                    mored = get4(extraLength + get_bits(drleaf), moreBits)
                     # print("mored:", mored)
                     distance += mored
                     # print("distance more:", distance, do, di, isize)
                     if distance > do:
                         print(distance, do)
                         raise Error("distance too big")
-                    adv(moreBits + extraLength + get_bits(leaf))
+                    adv(moreBits + extraLength + get_bits(drleaf))
                     # print("offset:", do - distance)
                     # print("FAIL?: ", di, dio, do, b1, b2, b3, b4)
                     offset.next = (do - distance) & OBS
@@ -1404,9 +1421,9 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
                 state.next = d_state.IDLE
 
     if FAST:
-        return io_logic, logic, fill_buf, oramwrite, oramread, matchers
+        return io_logic, logic, fill_buf, bramwrite, bramread, matchers
     else:
-        return io_logic, logic, fill_buf, oramwrite, oramread
+        return io_logic, logic, fill_buf, bramwrite, bramread
 
 
 if __name__ == "__main__":

@@ -286,12 +286,11 @@ def test_deflate_bench(i_clk, o_led, led0_g, led1_b, led2_r):
 
     i_data = Signal(intbv()[8:])
     o_byte = Signal(intbv()[8:])
-    u_data = Signal(intbv()[8:])
     o_iprogress = Signal(intbv()[LMAX:])
     o_oprogress = Signal(intbv()[LMAX:])
     resultlen = Signal(intbv()[LMAX:])
     i_waddr = Signal(modbv()[LMAX:])
-    i_raddr = Signal(modbv()[LBSIZE:])
+    i_raddr = Signal(modbv()[LMAX:])
 
     reset = ResetSignal(1, 0, True)
 

@@ -248,9 +248,11 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
         b10 = Signal(bool())
         b110 = Signal(bool())
 
-    nb = Signal(intbv()[3:])
+    # nb = Signal(intbv()[3:])
+    nb = Signal(bool())
 
     filled = Signal(bool())
+    first_block = Signal(bool())
 
     ob1 = Signal(intbv()[8:])
     copy1 = Signal(intbv()[8:])
@@ -292,11 +294,11 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
         if not reset:
             print("FILL RESET")
             nb.next = 0
-            b1.next = 0
-            b2.next = 0
-            b3.next = 0
-            b4.next = 0
-            old_di.next = 0
+            # b1.next = 0
+            # b2.next = 0
+            # b3.next = 0
+            # b4.next = 0
+            # old_di.next = 0
         else:
             if isize < 4:
                 nb.next = 0
@@ -321,7 +323,7 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
                         cwindow.next = (cwindow << shift) | (b15 >> (40 - shift))
 
                 if old_di == di:
-                    nb.next = 4
+                    nb.next = True # 4
 
                 old_di.next = di
 
@@ -339,9 +341,6 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
                     b10.next = iram[di+9 & IBS]
 
     def get4(boffset, width):
-        if nb != 4:
-            print("----NB----")
-            raise Error("NB")
         return (b41 >> (dio + boffset)) & ((1 << width) - 1)
         # return b41[dio + boffset + width: dio + boffset]
 
@@ -473,6 +472,7 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
                     do.next = 0
                     doo.next = 0
                     filled.next = True
+                    first_block.next = True
                     state.next = d_state.HEADER
 
                 else:
@@ -484,10 +484,11 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
                     pass
                 elif not filled:
                     filled.next = True
-                elif nb < 4:
+                elif not nb:
                     pass
                 # Read block header
-                elif di == 0:
+                elif first_block:
+                    first_block.next = False
                     #print(iram[di & IBS])
                     #if iram[di & IBS] == 0x78:
                     if b1 == 0x78:
@@ -544,9 +545,6 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
                 elif not filled:
                     no_adv = 1
                     filled.next = True
-                elif nb < 4:
-                    no_adv = 1
-                    pass
                 elif cur_cstatic == 0:
                     flush.next = False
                     ob1.next = 0
@@ -744,8 +742,6 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
                     pass
                 elif not filled:
                     filled.next = True
-                elif nb < 4:
-                    pass
                 else:
                     # print("cs",  cur_search, di, di - CWINDOW)
                     if cur_search >= 0 \
@@ -852,8 +848,6 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
                     pass
                 elif not filled:
                     filled.next = True
-                elif nb < 4:
-                    pass
                 elif numLiterals == 0:
                     print(di, isize)
                     numLiterals.next = 257 + get4(0, 5)
@@ -886,8 +880,6 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
                     pass
                 elif not filled:
                     filled.next = True
-                elif nb < 4:
-                    pass
                 elif numCodeLength < numLiterals + numDistance:
                     # print(numLiterals + numDistance, numCodeLength)
                     n_adv = 0
@@ -1171,8 +1163,6 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
                     pass
                 elif not filled:
                     filled.next = True
-                elif nb < 4:
-                    pass
                 elif cur_next == 0:
                     # print("INIT:", di, dio, instantMaxBit, maxBits)
                     cto = get4(0, maxBits)
@@ -1216,8 +1206,6 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
                     pass
                 elif not filled:
                     filled.next = True
-                elif nb < 4:
-                    pass
                 elif cur_next == 0:
                     # print("D_INIT:", di, dio, d_instantMaxBit, d_maxBits)
                     if d_instantMaxBit > InstantMaxBit:
@@ -1287,9 +1275,6 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
                     pass
                 elif not filled:
                     filled.next = True
-                elif nb < 4:  # nb <= 2 or (nb == 3 and dio > 1):
-                    # print("EXTRA FETCH", nb, dio)
-                    pass  # fetch more bytes
                 elif di >= isize - 4 and not i_mode == IDLE:
                     pass  # fetch more bytes
                 elif do >= i_raddr + OBSIZE: # - 10:
@@ -1361,8 +1346,6 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
                     pass
                 elif not filled:
                     filled.next = True
-                elif nb < 4:
-                    pass
                 elif cur_i == 0 and do + length >= i_raddr + OBSIZE: # - 10:
                     # print("HOLDW", length, offset, cur_i, do, i_raddr)
                     pass

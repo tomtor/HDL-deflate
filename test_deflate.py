@@ -79,7 +79,7 @@ class TestDeflate(unittest.TestCase):
             print("START TEST MODE", mode)
             print("==========================")
 
-            b_data, zl_data = test_data(mode, 25000)
+            b_data, zl_data = test_data(mode, 2500)
 
             if mode == 0:
                 reset.next = 0
@@ -182,7 +182,7 @@ class TestDeflate(unittest.TestCase):
             print("WRITE")
             i = 0
             ri = 0
-            slen = 25000
+            slen = 2500
             sresult = []
             wait = 0
             start = now()

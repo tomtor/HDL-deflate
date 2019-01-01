@@ -1,12 +1,12 @@
 """
 MyHDL FPGA Deflate (de)compressor, see RFC 1950/1951
 
-Copyright 2018 by Tom Vijlbrief
+Copyright (C) 2018/2019 by Tom Vijlbrief
 
 See: https://github.com/tomtor
 
 This MyHDL FPGA implementation is partially inspired by the C++ implementation
-from https://create.stephan-brumme.com/deflate-decoder
+of a decoder from https://create.stephan-brumme.com/deflate-decoder
 
 """
 
@@ -167,12 +167,12 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
 
     if DECOMPRESS:
         if DYNAMIC:
-            leaves = [Signal(intbv()[CODEBITS + BITBITS:]) for _ in range(16384)]
+            # leaves = [Signal(intbv()[CODEBITS + BITBITS:]) for _ in range(16384)]
+            leaves = [Signal(intbv()[CODEBITS + BITBITS:]) for _ in range(32768)]
             d_leaves = [Signal(intbv()[CODEBITS + BITBITS:]) for _ in range(4096)]
         else:
             leaves = [Signal(intbv()[CODEBITS + BITBITS:]) for _ in range(512)]
             d_leaves = [Signal(bool())]
-        # leaves = [Signal(intbv()[CODEBITS + BITBITS:]) for _ in range(32768)]
         # d_leaves = [Signal(intbv()[CODEBITS + BITBITS:]) for _ in range(32768)]
     else:
         leaves = [Signal(bool())]

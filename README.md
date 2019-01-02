@@ -47,7 +47,7 @@ The compress mode can be disabled by setting `COMPRESS` to `False`.
 The decompress mode can be disabled by setting `DECOMPRESS` to `False`.
 
 As an option you can disable dynamic tree decompression by setting `DYNAMIC` to `False`. 
-This will save a lot of LUT-ram and HDL-Deflate compressed output is always using a static tree,
+This will save a lot of BRAM and LUTs and HDL-Deflate compressed output is always using a static tree,
 but zlib will normally generate dynamic trees. Set zlib option `Z_FIXED` to generate streams with
 a static tree.
 
@@ -61,56 +61,65 @@ FAST MATCH10 compress only has quite good resource usage.
 ## Practical considerations
 
 In general HDL-Deflate is interesting when speed is important. When speed is not a real issue using a (soft)
-CPU with zlib is probably the better approach. Especially decompression is also quite fast with a CPU and HDL-Deflate
-needs a lot of LUTs when configured to decompress ANY deflate input stream. Compression is another story because it
+CPU with zlib is probably the better approach. Especially decompression is also reasonable fast with a CPU and HDL-Deflate
+needs a lot of BRAM when configured to decompress ANY deflate input stream. Compression is another story because it
 is a LOT faster in hardware with the `FAST` option and uses a reasonable amount of LUTs.
 
 # FPGA validation
 
-## Minimal with smaller leaves arrays
+## Default (Decompress with IBUF = 16 * CWINDOW and Compress with FAST/MATCH10)
 
 Resource|Estimation
 --------|----------
-LUT	|7116
-LUTRAM	|800
-FF	|2265
-BRAM	|4
-
-## Compress False and smaller leaves arrays
-
-Resource|Estimation
---------|----------
-LUT	|5769
-LUTRAM	|512
-FF	|2169
-BRAM	|4
+LUT	|11009
+LUTRAM	|1248
+FF	|3018
+BRAM	|33
 
 ## Decompress False and FAST and MATCH10
 
 Resource|Estimation
 --------|----------
-LUT	|5118
+LUT	|2767
+LUTRAM	|156
+FF	|747
+BRAM	|8.5
+
+## Decompress False and FAST
+
+Resource|Estimation
+--------|----------
+LUT	|2397
 LUTRAM	|84
-FF	|1577
-BRAM	|2
+FF	|695
+BRAM	|8.5
 
-## FAST
-
-Resource|Estimation
---------|----------
-LUT	|8246
-LUTRAM	|704
-FF	|2520
-BRAM	|4
-
-## FAST and MATCH10
+## Decompress False
 
 Resource|Estimation
 --------|----------
-LUT	|11888
-LUTRAM	|536
-FF	|3308
-BRAM	|4
+LUT	|1318
+LUTRAM	|120
+FF	|444
+BRAM	|8.5
+
+## Compress False
+
+Resource|Estimation
+--------|----------
+LUT	|5779
+LUTRAM	|48
+FF	|2491
+BRAM	|32.5
+
+## Compress False and Dynamic False
+
+Resource|Estimation
+--------|----------
+LUT	|2535
+LUTRAM	|48
+FF	|1094
+BRAM	|16.5
 
 ## Speed
 

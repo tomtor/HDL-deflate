@@ -17,7 +17,9 @@ from myhdl import always, block, Signal, intbv, Error, ResetSignal, \
 
 IDLE, RESET, WRITE, READ, STARTC, STARTD = range(6)
 
+COMPRESS = False
 COMPRESS = True
+
 DECOMPRESS = False
 DECOMPRESS = True
 
@@ -211,11 +213,11 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
     cur_HF1 = Signal(intbv()[MaxCodeLength+1:])
     cur_static = Signal(intbv()[9:])
     cur_cstatic = Signal(intbv()[LMAX:])
-    # cur_search = Signal(intbv(min=-CWINDOW,max=IBSIZE))
     cur_search = Signal(intbv(min=-1,max=1<<LMAX))
     cur_dist = Signal(intbv(min=-CWINDOW,max=IBSIZE))
     cur_next = Signal(intbv()[4:])
-    # cur_next = Signal(bool())
+
+    do_init = Signal(bool())
 
     length = Signal(modbv()[LOBSIZE:])
     offset = Signal(intbv()[LOBSIZE:])
@@ -662,7 +664,8 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
                     pass
                 elif flush:
                     do_flush()
-                elif cur_i == 1024:
+                elif do_init:
+                    do_init.next = False
                     lencode = length + 254
                     # print("fast:", distance, di, isize, match)
                     outlen = codeLength[lencode]
@@ -732,35 +735,47 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
                             lencode = 259
                             match = 5
                             if MATCH10:
-                              if fcount < 10:
+                              if fcount < 6:
                                   mdone = False
                                   print("fcount", fcount)
                               elif di < isize - 6 and \
                                     iram[fmatch2+2 & IBS] == b6:
                                 lencode = 260
                                 match = 6
-                                if di < isize - 7 and \
+                                if fcount < 7:
+                                    mdone = False
+                                    print("fcount", fcount)
+                                elif di < isize - 7 and \
                                         iram[fmatch2+3 & IBS] == b7:
                                     lencode = 261
                                     match = 7
-                                    if di < isize - 8 and \
+                                    if fcount < 8:
+                                        mdone = False
+                                        print("fcount", fcount)
+                                    elif di < isize - 8 and \
                                             iram[fmatch2+4 & IBS] == b8:
                                         lencode = 262
                                         match = 8
-                                        if di < isize - 9 and \
+                                        if fcount < 9:
+                                            mdone = False
+                                            print("fcount", fcount)
+                                        elif di < isize - 9 and \
                                                 iram[fmatch2+5 & IBS] == b9:
                                             lencode = 263
                                             match = 9
-                                            if di < isize - 10 and \
+                                            if fcount < 10:
+                                                mdone = False
+                                                print("fcount", fcount)
+                                            elif di < isize - 10 and \
                                                     iram[fmatch2+6 & IBS] == b10:
                                                 lencode = 264
                                                 match = 10
 
                     if mdone:
                         # distance = di - cur_search
-                        # print("d/l", di, distance, match)
+                        print("d/l", di, distance, match)
                         cur_dist.next = distance
-                        cur_i.next = 1024
+                        do_init.next = True
                         # adv(match * 8)
                         di.next = di + match
                         cur_cstatic.next = cur_cstatic + match - 1
@@ -835,7 +850,7 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
                             distance = di - cur_search
                             # print("distance", distance)
                             cur_dist.next = distance
-                            cur_i.next = 1024  # 0
+                            do_init.next = True
                             # adv(match * 8)
                             di.next = di + match
                             cur_cstatic.next = cur_cstatic + match - 1

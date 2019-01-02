@@ -36,8 +36,8 @@ OBSIZE = 8192   # Size of output buffer (BRAM)
 OBSIZE = 32768  # Size of output buffer for ANY input (BRAM)
 
 # Size of input buffer (LUT-RAM)
-IBSIZE = 16 * CWINDOW  # This size gives method 2 (dynamic tree) for testbench
 IBSIZE = 2 * CWINDOW   # Minimal window
+IBSIZE = 16 * CWINDOW  # This size gives method 2 (dynamic tree) for testbench
 
 LMAX = 24       # Size of progress and I/O counters
 
@@ -255,6 +255,8 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
         b10 = Signal(bool())
         b110 = Signal(bool())
 
+    fcount = Signal(intbv()[4:])
+
     # nb = Signal(intbv()[3:])
     nb = Signal(bool())
 
@@ -326,23 +328,40 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
                     else:
                         cwindow.next = (cwindow << shift) | (b15 >> (40 - shift))
 
-                if old_di == di:
-                    nb.next = True # 4
-
-                old_di.next = di
-
                 # print("B1", iram[di & IBS])
                 b1.next = iram[di & IBS]
                 b2.next = iram[di+1 & IBS]
                 b3.next = iram[di+2 & IBS]
-                b4.next = iram[di+3 & IBS]
-                b5.next = iram[di+4 & IBS]
-                if MATCH10:
-                    b6.next = iram[di+5 & IBS]
-                    b7.next = iram[di+6 & IBS]
-                    b8.next = iram[di+7 & IBS]
-                    b9.next = iram[di+8 & IBS]
-                    b10.next = iram[di+9 & IBS]
+
+                if old_di == di:
+                    """
+                    if fcount < 9:
+                        print("fcount", fcount)
+                    """
+                    nb.next = True
+                    if MATCH10:
+                        rb = iram[di + fcount & IBS]
+                        if fcount == 4:
+                            b5.next = rb
+                        elif fcount == 5:
+                            b6.next = rb
+                        elif fcount == 6:
+                            b7.next = rb
+                        elif fcount == 7:
+                            b8.next = rb
+                        elif fcount == 8:
+                            b9.next = rb
+                        elif fcount == 9:
+                            b10.next = rb
+
+                        if fcount < 10:
+                            fcount.next = fcount + 1
+                else:
+                    # print("fcount set", fcount)
+                    fcount.next = 4
+                    b4.next = iram[di+3 & IBS]
+
+                old_di.next = di
 
     def get4(boffset, width):
         return (b41 >> (dio + boffset)) & ((1 << width) - 1)
@@ -702,6 +721,7 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
                     # Length is 3 code
                     lencode = 257
                     match = 3
+                    mdone = True
 
                     if di < isize - 4 and \
                             iram[fmatch2 & IBS] == b4:
@@ -711,7 +731,11 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
                                 iram[fmatch2+1 & IBS] == b5:
                             lencode = 259
                             match = 5
-                            if MATCH10 and di < isize - 6 and \
+                            if MATCH10:
+                              if fcount < 10:
+                                  mdone = False
+                                  print("fcount", fcount)
+                              elif di < isize - 6 and \
                                     iram[fmatch2+2 & IBS] == b6:
                                 lencode = 260
                                 match = 6
@@ -732,15 +756,16 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
                                                 lencode = 264
                                                 match = 10
 
-                    # distance = di - cur_search
-                    # print("d/l", di, distance, match)
-                    cur_dist.next = distance
-                    cur_i.next = 1024
-                    # adv(match * 8)
-                    di.next = di + match
-                    cur_cstatic.next = cur_cstatic + match - 1
-                    length.next = match
-                    state.next = d_state.DISTANCE
+                    if mdone:
+                        # distance = di - cur_search
+                        # print("d/l", di, distance, match)
+                        cur_dist.next = distance
+                        cur_i.next = 1024
+                        # adv(match * 8)
+                        di.next = di + match
+                        cur_cstatic.next = cur_cstatic + match - 1
+                        length.next = match
+                        state.next = d_state.DISTANCE
 
             elif state == d_state.SEARCH:
 

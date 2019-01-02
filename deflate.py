@@ -32,7 +32,10 @@ MATCH10 = True
 FAST = False
 FAST = True
 
-CWINDOW = 32    # Search window for compression
+if MATCH10 and not FAST:
+    raise Error("Unsupported combination")
+
+CWINDOW = 32    # Search window for compression (64 Max)
 
 OBSIZE = 8192   # Size of output buffer (BRAM)
 OBSIZE = 32768  # Size of output buffer for ANY input (BRAM)

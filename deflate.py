@@ -26,14 +26,11 @@ DECOMPRESS = True
 DYNAMIC = False
 DYNAMIC = True
 
-MATCH10 = False
 MATCH10 = True
+MATCH10 = False
 
-FAST = False
 FAST = True
-
-if MATCH10 and not FAST:
-    raise Error("Unsupported combination")
+FAST = False
 
 CWINDOW = 32    # Search window for compression (64 Max)
 
@@ -344,11 +341,12 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
                         print("fcount", fcount)
                     """
                     nb.next = True
-                    if MATCH10:
-                        rb = iram[di + fcount & IBS]
-                        if fcount == 4:
-                            b5.next = rb
-                        elif fcount == 5:
+                    rb = iram[di + fcount & IBS]
+                    if fcount == 4:
+                        b5.next = rb
+                        fcount.next = 5
+                    elif MATCH10:
+                        if fcount == 5:
                             b6.next = rb
                         elif fcount == 6:
                             b7.next = rb
@@ -358,7 +356,6 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
                             b9.next = rb
                         elif fcount == 9:
                             b10.next = rb
-
                         if fcount < 10:
                             fcount.next = fcount + 1
                 else:
@@ -733,7 +730,10 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
                             iram[fmatch2 & IBS] == b4:
                         lencode = 258
                         match = 4
-                        if di < isize - 5 and \
+                        if fcount < 5:
+                            mdone = False
+                            print("fcount", fcount)
+                        elif di < isize - 5 and \
                                 iram[fmatch2+1 & IBS] == b5:
                             lencode = 259
                             match = 5
@@ -820,12 +820,16 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
                             # Length is 3 code
                             lencode = 257
                             match = 3
+                            mdone = True
 
                             if di < isize - 4 and \
                                     iram[cur_search+3 & IBS] == b4: # iram[di + 3 & IBS]:
                                 lencode = 258
                                 match = 4
-                                if di < isize - 5 and \
+                                if fcount < 5:
+                                    mdone = False
+                                    print("fcount", fcount)
+                                elif di < isize - 5 and \
                                         iram[cur_search+4 & IBS] == b5:
                                     lencode = 259
                                     match = 5
@@ -850,15 +854,16 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
                                                         lencode = 264
                                                         match = 10
 
-                            distance = di - cur_search
-                            # print("distance", distance)
-                            cur_dist.next = distance
-                            do_init.next = True
-                            # adv(match * 8)
-                            di.next = di + match
-                            cur_cstatic.next = cur_cstatic + match - 1
-                            length.next = match
-                            state.next = d_state.DISTANCE
+                            if mdone:
+                                distance = di - cur_search
+                                # print("distance", distance)
+                                cur_dist.next = distance
+                                do_init.next = True
+                                # adv(match * 8)
+                                di.next = di + match
+                                cur_cstatic.next = cur_cstatic + match - 1
+                                length.next = match
+                                state.next = d_state.DISTANCE
                         else:
                             cur_search.next = cur_search - 1
                     else:

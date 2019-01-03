@@ -130,3 +130,4 @@ The Vivado timing report fails at 100Mhz, but the test bench runs fine on my Art
 * ~~Reduce LUT usage~~
 * ~~Improve speed from current 80Mhz to 100Mhz~~
 * ~~Improve compression performance~~
+* Handle compress input streams < 4 bytes

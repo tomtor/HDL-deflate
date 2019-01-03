@@ -53,6 +53,9 @@ def test_data(m, tlen=100, limit=False):
         str_data = "".join([str(random.randrange(0,2))
                              for i in range(tlen)])
         b_data = str_data.encode('utf-8')
+    elif m == 5:
+        str_data = ""
+        b_data = str_data.encode('utf-8')
     else:
         raise Error("unknown test mode")
     # print(str_data)
@@ -202,7 +205,16 @@ class TestDeflate(unittest.TestCase):
                 else:
                     did_read = 0
 
-                if i < slen:
+                if len(b_data) < 4 and i == 0:
+                    """
+                    Short length input, just write 4 bytes.
+                    This is an API limitation!
+                    """
+                    i_mode.next = WRITE
+                    i_waddr.next = 4
+                    i_data.next = 0
+                    i = 1
+                elif i < slen and len(b_data) > 0:
                     if o_iprogress > i - MAXW:
                         i_mode.next = WRITE
                         i_waddr.next = i
@@ -241,7 +253,7 @@ class TestDeflate(unittest.TestCase):
 
 
         for loop in range(1):
-            for mode in range(5):
+            for mode in range(5,6):
             # for mode in range(2,3):
                 self.runTests(test_decompress)
 

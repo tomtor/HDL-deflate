@@ -26,8 +26,8 @@ DECOMPRESS = True
 DYNAMIC = False
 DYNAMIC = True
 
-MATCH10 = True
 MATCH10 = False
+MATCH10 = True
 
 FAST = True
 FAST = False
@@ -38,8 +38,8 @@ OBSIZE = 8192   # Size of output buffer (BRAM)
 OBSIZE = 32768  # Size of output buffer for ANY input (BRAM)
 
 # Size of input buffer (LUT-RAM)
-IBSIZE = 2 * CWINDOW   # Minimal window
 IBSIZE = 16 * CWINDOW  # This size gives method 2 (dynamic tree) for testbench
+IBSIZE = 2 * CWINDOW   # Minimal window
 
 LMAX = 24       # Size of progress and I/O counters
 
@@ -833,26 +833,30 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
                                         iram[cur_search+4 & IBS] == b5:
                                     lencode = 259
                                     match = 5
-                                    if MATCH10 and di < isize - 6 and \
-                                            iram[cur_search+5 & IBS] == b6:
-                                        lencode = 260
-                                        match = 6
-                                        if di < isize - 7 and \
+                                    if MATCH10:
+                                        if fcount < 10:
+                                            mdone = False
+                                            print("fcount", fcount)
+                                        elif di < isize - 6 and \
+                                                iram[cur_search+5 & IBS] == b6:
+                                            lencode = 260
+                                            match = 6
+                                            if di < isize - 7 and \
                                                 iram[cur_search+6 & IBS] == b7:
-                                            lencode = 261
-                                            match = 7
-                                            if di < isize - 8 and \
-                                                    iram[cur_search+7 & IBS] == b8:
-                                                lencode = 262
-                                                match = 8
-                                                if di < isize - 9 and \
-                                                        iram[cur_search+8 & IBS] == b9:
-                                                    lencode = 263
-                                                    match = 9
-                                                    if di < isize - 10 and \
-                                                            iram[cur_search+9 & IBS] == b10:
-                                                        lencode = 264
-                                                        match = 10
+                                                lencode = 261
+                                                match = 7
+                                                if di < isize - 8 and \
+                                                        iram[cur_search+7 & IBS] == b8:
+                                                    lencode = 262
+                                                    match = 8
+                                                    if di < isize - 9 and \
+                                                            iram[cur_search+8 & IBS] == b9:
+                                                        lencode = 263
+                                                        match = 9
+                                                        if di < isize - 10 and \
+                                                                iram[cur_search+9 & IBS] == b10:
+                                                            lencode = 264
+                                                            match = 10
 
                             if mdone:
                                 distance = di - cur_search

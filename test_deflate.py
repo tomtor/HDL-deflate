@@ -246,7 +246,7 @@ class TestDeflate(unittest.TestCase):
             print("IN/OUT/CYCLES/WAIT", slen, len(sresult),
                   (now() - start) // 10, wait)
             sresult = b''.join(sresult)
-            print("zlib test:", zlib.decompress(sresult)[:60])
+            print("zlib test:", zlib.decompress(sresult)[:130])
             rlen = min(len(b_data), slen)
             self.assertEqual(zlib.decompress(sresult)[:rlen], b_data[:rlen])
             print("DONE!")
@@ -360,7 +360,10 @@ def test_deflate_bench(i_clk, o_led, led0_g, led1_b, led2_r):
                 tbi.next = tbi.next + 1
             else:
                 reset.next = 1
-                tstate.next = tb_state.WRITE
+                if DECOMPRESS:
+                    tstate.next = tb_state.WRITE
+                else:
+                    tstate.next = tb_state.CWRITE
                 tbi.next = 0
 
         elif tstate == tb_state.HALT:
@@ -495,8 +498,19 @@ def test_deflate_bench(i_clk, o_led, led0_g, led1_b, led2_r):
                 tbi.next = 0
                 i_raddr.next = 0
                 i_mode.next = READ
-                tstate.next = tb_state.CRESULT
-                wtick.next = True
+                if not DECOMPRESS:
+                    if o_oprogress == 0x26:  # for CWINDOW = 32
+                        tstate.next = tb_state.CPAUSE
+                        resume.next = 1
+                        print("compress OK!")
+                    else:
+                        print("compress len FAILED", o_oprogress)
+                        tstate.next = tb_state.FAIL
+                else:
+                    tstate.next = tb_state.CRESULT
+                    wtick.next = True
+                if SLOWDOWN <= 4:
+                    raise StopSimulation()
 
         # verify compression
         elif tstate == tb_state.CRESULT:

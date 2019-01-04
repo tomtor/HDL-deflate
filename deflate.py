@@ -29,10 +29,10 @@ DYNAMIC = True
 MATCH10 = False
 MATCH10 = True
 
-FAST = True
 FAST = False
+FAST = True
 
-CWINDOW = 32    # Search window for compression (64 Max)
+CWINDOW = 32    # Search window for compression
 
 OBSIZE = 8192   # Size of output buffer (BRAM)
 OBSIZE = 32768  # Size of output buffer for ANY input (BRAM)
@@ -266,6 +266,8 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
     first_block = Signal(bool())
 
     ob1 = Signal(intbv()[8:])
+    outcarry = Signal(intbv()[9:])
+    outcarrybits = Signal(intbv()[4:])
     copy1 = Signal(intbv()[8:])
     copy2 = Signal(intbv()[8:])
     flush = Signal(bool())
@@ -666,6 +668,7 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
                     do_flush()
                 elif do_init:
                     do_init.next = False
+                    outcarrybits.next = 0
                     lencode = length + 254
                     # print("fast:", distance, di, isize, match)
                     outlen = codeLength[lencode]
@@ -675,6 +678,13 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
                     obyte.next = put(outbits, outlen)
                     put_adv(outbits, outlen)
                     cur_i.next = 0
+                elif outcarrybits:
+                    # print("CARRY", outcarry, outcarrybits)
+                    oaddr.next = do
+                    obyte.next = put(outcarry, outcarrybits)
+                    put_adv(outcarry, outcarrybits)
+                    cur_i.next = di - length + 1
+                    state.next = d_state.CHECKSUM
                 else:
                     # print("DISTANCE", di, do, cur_i, cur_dist)
                     nextdist = CopyDistance[cur_i+1]
@@ -689,13 +699,22 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
                             raise Error("too few extra")
                         # print("rev", cur_i, rev_bits(cur_i, 5))
                         outcode = (rev_bits(cur_i, 5) | (extra_dist << 5))
-                        # print("outcode", outcode)
                         oaddr.next = do
-                        obyte.next = put(outcode, 5 + extra_bits)
-                        put_adv(outcode, 5 + extra_bits)
-                        #state.next = d_state.CSTATIC
-                        cur_i.next = di - length + 1
-                        state.next = d_state.CHECKSUM
+                        if extra_bits <= 4:
+                            # print("outcode", outcode)
+                            obyte.next = put(outcode, 5 + extra_bits)
+                            put_adv(outcode, 5 + extra_bits)
+                            #state.next = d_state.CSTATIC
+                            cur_i.next = di - length + 1
+                            state.next = d_state.CHECKSUM
+                        else:
+                            # print("LONG", extra_bits, outcode)
+                            # outcarry.next = outcode & ((1 << (extra_bits - 4)) - 1)
+                            outcarry.next = outcode >> 8
+                            outcarrybits.next = extra_bits - 3
+                            outcode = outcode & 0xFF
+                            obyte.next = put(outcode, 8)
+                            put_adv(outcode, 8)
                     else:
                         cur_i.next = cur_i + 1
 
@@ -860,7 +879,7 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
 
                             if mdone:
                                 distance = di - cur_search
-                                # print("distance", distance)
+                                print("d/l", distance, match)
                                 cur_dist.next = distance
                                 do_init.next = True
                                 # adv(match * 8)
@@ -871,7 +890,6 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
                         else:
                             cur_search.next = cur_search - 1
                     else:
-                        # print("NO MATCH")
                         bdata = b1  # iram[di]
                         # adv(8)
                         di.next = di + 1

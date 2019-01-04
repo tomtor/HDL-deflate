@@ -80,9 +80,9 @@ BRAM	|33
 
 Resource|Estimation
 --------|----------
-LUT	|2767
+LUT	|2882
 LUTRAM	|156
-FF	|747
+FF	|754
 BRAM	|8.5
 
 ## Decompress False and FAST

@@ -389,18 +389,9 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
         if d > ((1 << width) - 1):
             raise Error("too big")
         # print("put:", d, width, do, doo, ob1, (ob1 | (d << doo)))
-        return (ob1 | (d << doo)) & 0xFF
-    """
+        obyte.next = (ob1 | (d << doo)) & 0xFF
         oaddr.next = do
-        obyte.next = put(outbits, outlen)
-        put_adv(outbits, outlen)
-    """
 
-    def put_adv(d, width):
-        if width > 9:
-            raise Error("width > 9")
-        if d > ((1 << width) - 1):
-            raise Error("too big")
         # print("put_adv:", d, width, do, doo, di, dio)
         pshift = (doo + width) > 8
         # print("pshift: ", pshift)
@@ -592,9 +583,7 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
                     obyte.next = 0x9c
                     do.next = 2
                 elif cur_cstatic == 2:
-                    oaddr.next = do
-                    obyte.next = put(0x3, 3)
-                    put_adv(0x3, 3)
+                    put(0x3, 3)
                 elif flush:
                     # print("flush", do, ob1)
                     no_adv = 1
@@ -611,9 +600,7 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
                         outlen = codeLength[cs_i]
                         outbits = out_codes[cs_i] # code_bits[cs_i]
                         print("EOF BITS:", cs_i, outlen, outbits)
-                        oaddr.next = do
-                        obyte.next = put(outbits, outlen)
-                        put_adv(outbits, outlen)
+                        put(outbits, outlen)
                     elif cur_cstatic - 3 == isize + 2:
                         print("calc end adler")
                         adler2.next = (adler2 + ladler1) % 65521
@@ -679,15 +666,11 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
                     outlen = codeLength[lencode]
                     outbits = out_codes[lencode] # code_bits[lencode]
                     # print("BITS:", outlen, outbits)
-                    oaddr.next = do
-                    obyte.next = put(outbits, outlen)
-                    put_adv(outbits, outlen)
+                    put(outbits, outlen)
                     cur_i.next = 0
                 elif outcarrybits:
                     # print("CARRY", outcarry, outcarrybits)
-                    oaddr.next = do
-                    obyte.next = put(outcarry, outcarrybits)
-                    put_adv(outcarry, outcarrybits)
+                    put(outcarry, outcarrybits)
                     state.next = d_state.CHECKSUM
                 else:
                     # print("DISTANCE", di, do, cur_i, cur_dist)
@@ -704,11 +687,9 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
                         # print("rev", cur_i, rev_bits(cur_i, 5))
                         cur_i.next = di - length + 1
                         outcode = (rev_bits(cur_i, 5) | (extra_dist << 5))
-                        oaddr.next = do
                         if extra_bits <= 4:
                             # print("outcode", outcode)
-                            obyte.next = put(outcode, 5 + extra_bits)
-                            put_adv(outcode, 5 + extra_bits)
+                            put(outcode, 5 + extra_bits)
                             #state.next = d_state.CSTATIC
                             state.next = d_state.CHECKSUM
                         else:
@@ -717,8 +698,7 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
                             outcarry.next = outcode >> 8
                             outcarrybits.next = extra_bits - 3
                             outcode = outcode & 0xFF
-                            obyte.next = put(outcode, 8)
-                            put_adv(outcode, 8)
+                            put(outcode, 8)
                     else:
                         cur_i.next = cur_i + 1
 
@@ -900,9 +880,7 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
                         outlen = codeLength[bdata]
                         outbits = out_codes[bdata] # code_bits[bdata]
                         # print("CBITS:", bdata, outlen, outbits)
-                        oaddr.next = do
-                        obyte.next = put(outbits, outlen)
-                        put_adv(outbits, outlen)
+                        put(outbits, outlen)
                         state.next = d_state.CSTATIC
 
             elif state == d_state.STATIC:

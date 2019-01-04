@@ -2,6 +2,7 @@ import unittest
 import os
 import zlib
 import random
+import urllib.request
 
 from myhdl import delay, now, Signal, intbv, ResetSignal, Simulation, \
                   Cosimulation, block, instance, StopSimulation, modbv, \
@@ -56,6 +57,10 @@ def test_data(m, tlen=100, limit=False):
     elif m == 5:
         str_data = ""
         b_data = str_data.encode('utf-8')
+    elif m == 6:
+        b_data = urllib.request.urlopen("http://v7f.eu").read()
+    elif m == 7:
+        b_data = urllib.request.urlopen("https://ajax.googleapis.com/ajax/libs/jquery/1.12.0/jquery.min.js").read()
     else:
         raise Error("unknown test mode")
     # print(str_data)
@@ -185,7 +190,7 @@ class TestDeflate(unittest.TestCase):
             print("WRITE")
             i = 0
             ri = 0
-            slen = 2500
+            slen = 10000
             sresult = []
             wait = 0
             start = now()
@@ -253,8 +258,8 @@ class TestDeflate(unittest.TestCase):
 
 
         for loop in range(1):
+            # for mode in range(8):
             for mode in range(6):
-            # for mode in range(2,3):
                 self.runTests(test_decompress)
 
     def runTests(self, test):

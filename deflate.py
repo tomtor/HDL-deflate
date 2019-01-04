@@ -32,14 +32,19 @@ MATCH10 = True
 FAST = False
 FAST = True
 
-CWINDOW = 32    # Search window for compression
+# Search window for compression
+if FAST:
+    CWINDOW = 64
+    CWINDOW = 32
+else:
+    CWINDOW = 512
 
 OBSIZE = 8192   # Size of output buffer (BRAM)
 OBSIZE = 32768  # Size of output buffer for ANY input (BRAM)
 
 # Size of input buffer (LUT-RAM)
-IBSIZE = 16 * CWINDOW  # This size gives method 2 (dynamic tree) for testbench
 IBSIZE = 2 * CWINDOW   # Minimal window
+IBSIZE = 16 * CWINDOW  # This size gives method 2 (dynamic tree) for testbench
 
 LMAX = 24       # Size of progress and I/O counters
 

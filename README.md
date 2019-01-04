@@ -16,12 +16,14 @@ Usage should be clear from the test bench in `test_deflate.py`.
 
     CWINDOW = 32    # Search window for compression
 
-## Compression efficiency
+## Sliding input window
 
 One can use a sliding window to reduce the size of the input buffer and the LUT-usage.
 
 The minimal value is 2 * CWINDOW (64 bytes), the UnitTest in `test_deflate.py`
 uses this strategy.
+
+## Compression efficiency
 
 By default the compressor will reduce repeated 3/4/5 byte sequences in the search window to 15 bit.
 This will result in a decent compression ratio for many real life input data patterns.

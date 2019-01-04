@@ -506,11 +506,11 @@ def test_deflate_bench(i_clk, o_led, led0_g, led1_b, led2_r):
                     else:
                         print("compress len FAILED", o_oprogress)
                         tstate.next = tb_state.FAIL
+                    if SLOWDOWN <= 4:
+                        raise StopSimulation()
                 else:
                     tstate.next = tb_state.CRESULT
                     wtick.next = True
-                if SLOWDOWN <= 4:
-                    raise StopSimulation()
 
         # verify compression
         elif tstate == tb_state.CRESULT:

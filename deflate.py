@@ -575,7 +575,7 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
                 no_adv = 0
                 if not COMPRESS:
                     pass
-                elif not filled:
+                elif False and not filled:
                     print("CSTATIC !F")
                     no_adv = 1
                     filled.next = True

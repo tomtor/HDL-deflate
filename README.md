@@ -101,13 +101,13 @@ LUTRAM	|84
 FF	|695
 BRAM	|8.5
 
-## Decompress False
+## Decompress False and MATCH10
 
 Resource|Estimation
 --------|----------
-LUT	|1318
+LUT	|1485
 LUTRAM	|120
-FF	|444
+FF	|517
 BRAM	|8.5
 
 ## Compress False
@@ -130,7 +130,8 @@ BRAM	|16.5
 
 ## Speed
 
-The Vivado timing report fails at 100Mhz, but the test bench runs fine on my Arty at 100Mhz.
+The Vivado timing report fails at 100Mhz for FAST/MATCH10, but the test bench runs fine on my Arty at 100Mhz.
+Non FAST passes timing constraints for 100 Mhz.
 
 # Future Improvements (when there is interest)
 

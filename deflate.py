@@ -39,8 +39,8 @@ OBSIZE = 8192   # Size of output buffer (BRAM)
 OBSIZE = 32768  # Size of output buffer for ANY input (BRAM)
 
 # Size of input buffer (LUT-RAM)
-IBSIZE = 16 * CWINDOW  # This size gives method 2 (dynamic tree) for testbench
 IBSIZE = 2 * CWINDOW   # Minimal window
+IBSIZE = 16 * CWINDOW  # This size gives method 2 (dynamic tree) for testbench
 
 LMAX = 24       # Size of progress and I/O counters
 
@@ -60,7 +60,7 @@ d_state = enum('IDLE', 'HEADER', 'BL', 'READBL', 'REPEAT', 'DISTTREE', 'INIT3',
                'HF1', 'HF1INIT', 'HF2', 'HF3', 'HF4', 'HF4_2', 'HF4_3',
                'STATIC', 'D_NEXT', 'D_NEXT_2',
                'D_INFLATE', 'SPREAD', 'NEXT', 'INFLATE', 'COPY', 'CSTATIC',
-               'SEARCH', 'SEARCHF', 'DISTANCE', 'CHECKSUM') # , encoding='one_hot')
+               'SEARCH', 'SEARCH10', 'SEARCHF', 'DISTANCE', 'CHECKSUM') # , encoding='one_hot')
 
 CodeLengthOrder = (16, 17, 18, 0, 8, 7, 9, 6, 10, 5, 11, 4, 12, 3, 13, 2, 14,
                    1, 15)
@@ -216,8 +216,10 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
     cur_static = Signal(intbv()[9:])
     cur_cstatic = Signal(intbv()[LMAX:])
     cur_search = Signal(intbv(min=-1,max=1<<LMAX))
+    more = Signal(intbv()[4:])
+    moreb = Signal(intbv()[8:])
     cur_dist = Signal(intbv(min=-CWINDOW,max=IBSIZE))
-    cur_next = Signal(intbv()[4:])
+    cur_next = Signal(intbv()[5:])
 
     do_init = Signal(bool())
 
@@ -575,10 +577,6 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
                 no_adv = 0
                 if not COMPRESS:
                     pass
-                elif False and not filled:
-                    print("CSTATIC !F")
-                    no_adv = 1
-                    filled.next = True
                 elif not nb:
                     no_adv = 1
                 elif cur_cstatic == 0:
@@ -604,45 +602,45 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
                 elif cur_cstatic >= isize - 10 and i_mode != IDLE:
                     print("P", cur_cstatic, isize)
                     no_adv = 1
-                elif cur_cstatic - 3 > isize:
-                    if cur_cstatic - 3 == isize + 1:
+                elif cur_cstatic > isize + 3:
+                    if cur_cstatic == isize + 4:
                         print("Put EOF", do)
                         cs_i = EndOfBlock
                         outlen = codeLength[cs_i]
                         outbits = out_codes[cs_i] # code_bits[cs_i]
                         print("EOF BITS:", cs_i, outlen, outbits)
                         put(outbits, outlen)
-                    elif cur_cstatic - 3 == isize + 2:
+                    elif cur_cstatic == isize + 5:
                         print("calc end adler")
                         adler2.next = (adler2 + ladler1) % 65521
                         if doo != 0:
                             oaddr.next = do
                             obyte.next = ob1
                             do.next = do + 1
-                    elif cur_cstatic - 3 == isize + 3:
+                    elif cur_cstatic == isize + 6:
                         print("c1")
                         oaddr.next = do
                         obyte.next = adler2 >> 8
                         do.next = do + 1
                         o_oprogress.next = do + 1
-                    elif cur_cstatic - 3 == isize + 4:
+                    elif cur_cstatic == isize + 7:
                         print("c2")
                         oaddr.next = do
                         obyte.next = adler2 & 0xFF
                         do.next = do + 1
                         o_oprogress.next = do + 1
-                    elif cur_cstatic - 3 == isize + 5:
+                    elif cur_cstatic == isize + 8:
                         print("c3")
                         oaddr.next = do
                         obyte.next = adler1 >> 8
                         do.next = do + 1
                         o_oprogress.next = do + 1
-                    elif cur_cstatic - 3 == isize + 6:
+                    elif cur_cstatic == isize + 9:
                         print("c4")
                         oaddr.next = do
                         obyte.next = adler1 & 0xFF
                         o_oprogress.next = do + 1
-                    elif cur_cstatic - 3 == isize + 7:
+                    elif cur_cstatic == isize + 10:
                         print("EOF finish", do)
                         o_done.next = True
                         state.next = d_state.IDLE
@@ -803,9 +801,6 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
 
                 if not COMPRESS:
                     pass
-                elif not filled:
-                    print("SEARCH !F")
-                    filled.next = True
                 else:
                     # print("cs",  cur_search, di, di - CWINDOW)
                     if cur_search >= 0 \
@@ -830,59 +825,12 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
                                 state.next = d_state.SEARCHF
 
                         elif not FAST and iram[cur_search & IBS] == b1 and \
-                                iram[cur_search+1 & IBS] == b2 and \
-                                iram[cur_search+2 & IBS] == b3:
-                            # Length is 3 code
-                            lencode = 257
-                            match = 3
-                            mdone = True
+                                iram[cur_search + 1 & IBS] == b2 and \
+                                iram[cur_search + 2 & IBS] == b3:
+                                more.next = 4
+                                # moreb.next = iram[cur_search + 3 & IBS]
+                                state.next = d_state.SEARCH10
 
-                            if di < isize - 4 and \
-                                    iram[cur_search+3 & IBS] == b4: # iram[di + 3 & IBS]:
-                                lencode = 258
-                                match = 4
-                                if fcount < 5:
-                                    mdone = False
-                                    # print("fcount", fcount)
-                                elif di < isize - 5 and \
-                                        iram[cur_search+4 & IBS] == b5:
-                                    lencode = 259
-                                    match = 5
-                                    if MATCH10:
-                                        if fcount < 10:
-                                            mdone = False
-                                            # print("fcount", fcount)
-                                        elif di < isize - 6 and \
-                                                iram[cur_search+5 & IBS] == b6:
-                                            lencode = 260
-                                            match = 6
-                                            if di < isize - 7 and \
-                                                iram[cur_search+6 & IBS] == b7:
-                                                lencode = 261
-                                                match = 7
-                                                if di < isize - 8 and \
-                                                        iram[cur_search+7 & IBS] == b8:
-                                                    lencode = 262
-                                                    match = 8
-                                                    if di < isize - 9 and \
-                                                            iram[cur_search+8 & IBS] == b9:
-                                                        lencode = 263
-                                                        match = 9
-                                                        if di < isize - 10 and \
-                                                                iram[cur_search+9 & IBS] == b10:
-                                                            lencode = 264
-                                                            match = 10
-
-                            if mdone:
-                                distance = di - cur_search
-                                # print("d/l", distance, match)
-                                cur_dist.next = distance
-                                do_init.next = True
-                                # adv(match * 8)
-                                di.next = di + match
-                                cur_cstatic.next = cur_cstatic + match - 1
-                                length.next = match
-                                state.next = d_state.DISTANCE
                         else:
                             cur_search.next = cur_search - 1
                     else:
@@ -894,6 +842,46 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
                         # print("CBITS:", bdata, outlen, outbits)
                         put(outbits, outlen)
                         state.next = d_state.CSTATIC
+
+            elif state == d_state.SEARCH10:
+
+                mdone = True
+                # print("more/fcount", more, fcount)
+                limit = 5
+                if MATCH10:
+                    limit = 10
+                if more <= limit:
+                    if fcount < more:
+                        raise Error("???")
+                    cbyte = b4
+                    if more == 5:
+                        cbyte = b5
+                    elif more == 6:
+                        cbyte = b6
+                    elif more == 7:
+                        cbyte = b7
+                    elif more == 8:
+                        cbyte = b8
+                    elif more == 9:
+                        cbyte = b9
+                    elif more == 10:
+                        cbyte = b10
+
+                    if di < isize - more and iram[cur_search + more - 1 & IBS] == cbyte:
+                        more.next = more + 1
+                        mdone = False
+
+                if mdone:
+                    match = more - 1
+                    distance = di - cur_search
+                    print("d/l", distance, match)
+                    cur_dist.next = distance
+                    do_init.next = True
+                    # adv(match * 8)
+                    di.next = di + match
+                    cur_cstatic.next = cur_cstatic + match - 1
+                    length.next = match
+                    state.next = d_state.DISTANCE
 
             elif state == d_state.STATIC:
 

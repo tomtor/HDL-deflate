@@ -38,7 +38,8 @@ better to use a more dense coding in your FPGA application data in the first pla
 
 ## Decompression speed
 
-Method 0 (copy mode) 2 cycles for each output byte. Other methods about 3 cycles for each output byte.
+Method 0 (copy mode) 2 cycles for each output byte. Other methods from 1 (long repeated sequences)
+to 4 cycles for each output byte.
 
 ## Compression speed
 

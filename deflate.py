@@ -33,18 +33,14 @@ FAST = False
 FAST = True
 
 # Search window for compression
-if FAST:
-    CWINDOW = 64
-    CWINDOW = 32
-else:
-    CWINDOW = 512
+CWINDOW = 32
 
 OBSIZE = 8192   # Size of output buffer (BRAM)
 OBSIZE = 32768  # Size of output buffer for ANY input (BRAM)
 
 # Size of input buffer (LUT-RAM)
-IBSIZE = 2 * CWINDOW   # Minimal window
 IBSIZE = 16 * CWINDOW  # This size gives method 2 (dynamic tree) for testbench
+IBSIZE = 2 * CWINDOW   # Minimal window
 
 LMAX = 24       # Size of progress and I/O counters
 
@@ -580,6 +576,7 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
                 if not COMPRESS:
                     pass
                 elif not filled:
+                    print("CSTATIC !F")
                     no_adv = 1
                     filled.next = True
                 elif not nb:
@@ -749,7 +746,7 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
                         match = 4
                         if fcount < 5:
                             mdone = False
-                            print("fcount", fcount)
+                            # print("fcount", fcount)
                         elif di < isize - 5 and \
                                 iram[fmatch2+1 & IBS] == b5:
                             lencode = 259
@@ -757,35 +754,35 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
                             if MATCH10:
                               if fcount < 6:
                                   mdone = False
-                                  print("fcount", fcount)
+                                  # print("fcount", fcount)
                               elif di < isize - 6 and \
                                     iram[fmatch2+2 & IBS] == b6:
                                 lencode = 260
                                 match = 6
                                 if fcount < 7:
                                     mdone = False
-                                    print("fcount", fcount)
+                                    # print("fcount", fcount)
                                 elif di < isize - 7 and \
                                         iram[fmatch2+3 & IBS] == b7:
                                     lencode = 261
                                     match = 7
                                     if fcount < 8:
                                         mdone = False
-                                        print("fcount", fcount)
+                                        # print("fcount", fcount)
                                     elif di < isize - 8 and \
                                             iram[fmatch2+4 & IBS] == b8:
                                         lencode = 262
                                         match = 8
                                         if fcount < 9:
                                             mdone = False
-                                            print("fcount", fcount)
+                                            # print("fcount", fcount)
                                         elif di < isize - 9 and \
                                                 iram[fmatch2+5 & IBS] == b9:
                                             lencode = 263
                                             match = 9
                                             if fcount < 10:
                                                 mdone = False
-                                                print("fcount", fcount)
+                                                # print("fcount", fcount)
                                             elif di < isize - 10 and \
                                                     iram[fmatch2+6 & IBS] == b10:
                                                 lencode = 264
@@ -793,7 +790,7 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
 
                     if mdone:
                         # distance = di - cur_search
-                        print("d/l", di, distance, match)
+                        # print("d/l", di, distance, match)
                         cur_dist.next = distance
                         do_init.next = True
                         # adv(match * 8)
@@ -807,6 +804,7 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
                 if not COMPRESS:
                     pass
                 elif not filled:
+                    print("SEARCH !F")
                     filled.next = True
                 else:
                     # print("cs",  cur_search, di, di - CWINDOW)
@@ -845,7 +843,7 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
                                 match = 4
                                 if fcount < 5:
                                     mdone = False
-                                    print("fcount", fcount)
+                                    # print("fcount", fcount)
                                 elif di < isize - 5 and \
                                         iram[cur_search+4 & IBS] == b5:
                                     lencode = 259
@@ -853,7 +851,7 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
                                     if MATCH10:
                                         if fcount < 10:
                                             mdone = False
-                                            print("fcount", fcount)
+                                            # print("fcount", fcount)
                                         elif di < isize - 6 and \
                                                 iram[cur_search+5 & IBS] == b6:
                                             lencode = 260
@@ -877,7 +875,7 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
 
                             if mdone:
                                 distance = di - cur_search
-                                print("d/l", distance, match)
+                                # print("d/l", distance, match)
                                 cur_dist.next = distance
                                 do_init.next = True
                                 # adv(match * 8)
@@ -1239,6 +1237,7 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
                 if not DECOMPRESS:
                     pass
                 elif not filled:
+                    # print("NEXT !F")
                     filled.next = True
                 elif cur_next == 0:
                     # print("INIT:", di, dio, instantMaxBit, maxBits)
@@ -1250,7 +1249,7 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
                     cur_next.next = instantMaxBit + 1
                     # print(cur_next, mask, leaf, maxBits)
                 # elif get_bits(leaf) >= cur_next:
-                elif get_bits(rleaf) >= cur_next:
+                elif DYNAMIC and get_bits(rleaf) >= cur_next:
                     print("CACHE MISS", cur_next)
                     cto = get4(0, maxBits)
                     mask = (1 << cur_next) - 1
@@ -1353,7 +1352,8 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
 
                 if not DECOMPRESS:
                     pass
-                elif not filled:
+                elif method == 1 and not filled:
+                    # print("INFLATE !F")
                     filled.next = True
                 elif di >= isize - 4 and not i_mode == IDLE:
                     pass  # fetch more bytes
@@ -1424,8 +1424,6 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
 
                 if not DECOMPRESS:
                     pass
-                elif not filled:
-                    filled.next = True
                 elif cur_i == 0 and do + length >= i_raddr + OBSIZE: # - 10:
                     # print("HOLDW", length, offset, cur_i, do, i_raddr)
                     pass
@@ -1433,7 +1431,10 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
                     # print("HOLD2")
                     pass
                 elif method == 0:
-                    if cur_i < length:
+                    if not filled:
+                        # print("COPY !F")
+                        filled.next = True
+                    elif cur_i < length:
                         oaddr.next = do
                         obyte.next = b3
                         adv(8)

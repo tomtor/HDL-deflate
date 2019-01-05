@@ -82,7 +82,7 @@ class TestDeflate(unittest.TestCase):
           def tick():
               clk.next = not clk
 
-          for tloop in range(2):
+          for tloop in range(1):
             print("")
             print("==========================")
             print("START TEST MODE", mode, tloop)
@@ -273,7 +273,8 @@ class TestDeflate(unittest.TestCase):
 
         for loop in range(1):
             # for mode in range(8):
-            for mode in range(6):
+            # for mode in range(6):
+            for mode in range(4):
                 self.runTests(test_decompress)
 
     def runTests(self, test):
@@ -344,6 +345,8 @@ def test_deflate_bench(i_clk, o_led, led0_g, led1_b, led2_r):
 
     resume = Signal(modbv(0)[6:])
 
+    start = Signal(intbv(0)[16:])
+
     @instance
     def clkgen():
         i_clk.next = 0
@@ -412,6 +415,7 @@ def test_deflate_bench(i_clk, o_led, led0_g, led1_b, led2_r):
                 tstate.next = tb_state.DECOMPRESS
 
         elif tstate == tb_state.DECOMPRESS:
+            start.next = now()
             i_mode.next = STARTD
             tstate.next = tb_state.WAIT
 
@@ -419,6 +423,7 @@ def test_deflate_bench(i_clk, o_led, led0_g, led1_b, led2_r):
             led1_b.next = not led1_b
             i_mode.next = IDLE
             if i_mode == IDLE and o_done:
+                print("FINISH DECOMPRESS IN", (now() - start) // 10)
                 print("result len", o_oprogress)
                 resultlen.next = o_oprogress
                 tbi.next = 0
@@ -508,10 +513,12 @@ def test_deflate_bench(i_clk, o_led, led0_g, led1_b, led2_r):
         elif tstate == tb_state.CWAIT:
             led2_r.next = not led2_r
             if i_mode == STARTC:
+                start.next = now()
                 print("WAIT COMPRESS")
                 i_mode.next = IDLE
                 led1_b.next = 0
             elif o_done:
+                print("FINISH COMPRESS IN", (now() - start) // 10)
                 print("result len", o_oprogress)
                 resultlen.next = o_oprogress
                 tbi.next = 0

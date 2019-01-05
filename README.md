@@ -36,11 +36,15 @@ Another strategy for data sets with just a small set of used byte values would b
 to use a dedicated pre-computed Huffman tree. I could add this if there is interest, but it is probably
 better to use a more dense coding in your FPGA application data in the first place.
 
+## Decompression speed
+
+Method 0 (copy mode) 2 cycles for each output byte. Other methods about 3 cycles for each output byte.
+
 ## Compression speed
 
 To reduce LUT usage the original implementation matched each slot in the search window in a dedicated clock cycle.
 By setting `FAST` to `True` it will generate the logic to match the whole window in a single cycle.
-The effective speed will be around 1 input byte every two cycles.
+The effective speed will be around 1 input byte every 3 cycles.
 
 ## Disabling functionality to save LUTs
 

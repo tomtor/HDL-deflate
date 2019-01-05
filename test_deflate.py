@@ -79,12 +79,13 @@ class TestDeflate(unittest.TestCase):
         def test_decompress(i_mode, o_done, i_data, o_iprogress,
                             o_oprogress, o_byte, i_waddr, i_raddr, clk, reset):
 
-            def tick():
-                clk.next = not clk
+          def tick():
+              clk.next = not clk
 
+          for tloop in range(2):
             print("")
             print("==========================")
-            print("START TEST MODE", mode)
+            print("START TEST MODE", mode, tloop)
             print("==========================")
 
             b_data, zl_data = test_data(mode, 2500)
@@ -102,7 +103,10 @@ class TestDeflate(unittest.TestCase):
 
                 print("STREAM LENGTH", len(zl_data))
 
-                i_mode.next = IDLE
+                print("CLEAR OLD INPUT")
+                i_mode.next = WRITE
+                i_waddr.next = 0
+                i_raddr.next = 0
                 tick()
                 yield delay(5)
                 tick()
@@ -180,6 +184,15 @@ class TestDeflate(unittest.TestCase):
 
             print("==========STREAMING COMPRESS TEST=========")
 
+            print("CLEAR OLD INPUT")
+            i_mode.next = WRITE
+            i_waddr.next = 0
+            i_raddr.next = 0
+            tick()
+            yield delay(5)
+            tick()
+            yield delay(5)
+
             print("STARTC")
             i_mode.next = STARTC
             tick()
@@ -215,6 +228,7 @@ class TestDeflate(unittest.TestCase):
                     Short length input, just write 4 bytes.
                     This is an API limitation!
                     """
+                    print("SHORT INPUT")
                     i_mode.next = WRITE
                     i_waddr.next = 4
                     i_data.next = 0

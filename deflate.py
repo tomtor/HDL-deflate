@@ -144,6 +144,7 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
     isize = Signal(intbv()[LMAX:])
     state = Signal(d_state.IDLE)
     method = Signal(intbv()[3:])
+    prev_method = Signal(intbv(3)[2:])
     final = Signal(bool())
     wtick = Signal(bool())
     do_compress = Signal(bool())
@@ -466,8 +467,7 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
             print("DEFLATE RESET")
             state.next = d_state.IDLE
             o_done.next = False
-            # oaddr.next = 0
-            # obyte.next = 0
+            prev_method.next = 3  # Illegal value
         else:
 
             if state == d_state.IDLE:
@@ -476,7 +476,7 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
 
                     print("STARTC")
                     do_compress.next = True
-                    method.next = 1
+                    # method.next = 1
                     o_done.next = False
                     o_iprogress.next = 0
                     o_oprogress.next = 0
@@ -486,6 +486,7 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
                     doo.next = 0
                     filled.next = True
                     cur_static.next = 0
+                    cur_cstatic.next = 0
                     state.next = d_state.STATIC
 
                 elif DECOMPRESS and i_mode == STARTD:
@@ -547,7 +548,13 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
                     elif hm == 1:
                         static.next = True
                         cur_static.next = 0
-                        state.next = d_state.STATIC
+                        print("prev method is", prev_method)
+                        if prev_method == 1:
+                            print("skip HF init")
+                            state.next = d_state.NEXT
+                            cur_next.next = 0
+                        else:
+                            state.next = d_state.STATIC
                         adv(3)
                     elif hm == 0:
                         state.next = d_state.COPY
@@ -562,6 +569,8 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
                         state.next = d_state.IDLE
                         print("Bad method")
                         raise Error("Bad method")
+                    prev_method.next = hm
+                    print("set prev", hm)
 
             elif state == d_state.CSTATIC:
 

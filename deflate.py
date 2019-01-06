@@ -23,23 +23,27 @@ COMPRESS = True
 DECOMPRESS = False
 DECOMPRESS = True
 
-DYNAMIC = False
 DYNAMIC = True
+DYNAMIC = False
 
 MATCH10 = False
 MATCH10 = True
 
-FAST = False
 FAST = True
+FAST = False
+
+if not DECOMPRESS:
+    MATCH10 = False
 
 # Search window for compression
 if FAST:
     CWINDOW = 32
 else:
-    CWINDOW = 32
     CWINDOW = 256
+    CWINDOW = 32
 
 OBSIZE = 8192   # Size of output buffer (BRAM)
+OBSIZE = 1024   # Size of output buffer (BRAM)
 OBSIZE = 32768  # Size of output buffer for ANY input (BRAM)
 
 # Size of input buffer (LUT-RAM)
@@ -1389,7 +1393,7 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
                             # print("distance2", distance)
                             adv(extraLength + 5 + moreBits)
                             # print("adv", extraLength + 5 + moreBits)
-                            offset.next = do - distance
+                            offset.next = (do - distance) & OBS
                             length.next = tlength
                             cur_i.next = 0
                             oraddr.next = do - distance

@@ -29,17 +29,18 @@ DYNAMIC = True
 MATCH10 = False
 MATCH10 = True
 
-FAST = True
 FAST = False
+FAST = True
 
 # Search window for compression
 if FAST:
     CWINDOW = 32
 else:
+    CWINDOW = 32
     CWINDOW = 256
 
-OBSIZE = 32768  # Size of output buffer for ANY input (BRAM)
 OBSIZE = 8192   # Size of output buffer (BRAM)
+OBSIZE = 32768  # Size of output buffer for ANY input (BRAM)
 
 # Size of input buffer (LUT-RAM)
 if FAST:
@@ -389,12 +390,10 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
             filled.next = False
 
     def put(d, width):
-        """
         if width > 9:
             raise Error("width > 9")
         if d > ((1 << width) - 1):
             raise Error("too big")
-        """
         # print("put:", d, width, do, doo, ob1, (ob1 | (d << doo)))
         obyte.next = (ob1 | (d << doo)) & 0xFF
         oaddr.next = do
@@ -425,13 +424,11 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
         do.next = do + 1
 
     def rev_bits(b, nb):
-        """
         if b >= 1 << nb:
             raise Error("too few bits")
             print("too few bits")
         if nb > 15:
             raise Error("nb too large")
-        """
         r = (((b >> 14) & 0x1) << 0) | (((b >> 13) & 0x1) << 1) | \
             (((b >> 12) & 0x1) << 2) | (((b >> 11) & 0x1) << 3) | \
             (((b >> 10) & 0x1) << 4) | (((b >> 9) & 0x1) << 5) | \
@@ -444,12 +441,10 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
         return r
 
     def makeLeaf(lcode, lbits):
-        """
         if lcode >= 1 << CODEBITS:
             raise Error("code too big")
         if lbits >= 1 << BITBITS:
             raise Error("bits too big")
-        """
         return (lcode << BITBITS) | lbits
 
     def get_bits(aleaf):

@@ -33,14 +33,19 @@ FAST = False
 FAST = True
 
 # Search window for compression
-CWINDOW = 32
+if FAST:
+    CWINDOW = 32
+else:
+    CWINDOW = 256
 
 OBSIZE = 8192   # Size of output buffer (BRAM)
 OBSIZE = 32768  # Size of output buffer for ANY input (BRAM)
 
 # Size of input buffer (LUT-RAM)
-IBSIZE = 2 * CWINDOW   # Minimal window
-IBSIZE = 16 * CWINDOW  # This size gives method 2 (dynamic tree) for testbench
+if FAST:
+    IBSIZE = 16 * CWINDOW  # This size gives method 2 (dynamic tree) for testbench
+else:
+    IBSIZE = 2 * CWINDOW   # Minimal window
 
 LMAX = 24       # Size of progress and I/O counters
 
@@ -224,6 +229,8 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
     do_init = Signal(bool())
 
     length = Signal(modbv()[LOBSIZE:])
+    mlength = Signal(modbv()[4:])
+    dlength = Signal(modbv()[10:])
     offset = Signal(intbv()[LOBSIZE:])
 
     di = Signal(modbv()[LMAX:])
@@ -669,8 +676,9 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
                     do_flush()
                 elif do_init:
                     do_init.next = False
+                    cur_cstatic.next = cur_cstatic + mlength - 1
                     outcarrybits.next = 0
-                    lencode = length + 254
+                    lencode = mlength + 254
                     # print("fast:", distance, di, isize, match)
                     outlen = codeLength[lencode]
                     outbits = out_codes[lencode] # code_bits[lencode]
@@ -694,7 +702,7 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
                         if extra_dist > ((1 << extra_bits) - 1):
                             raise Error("too few extra")
                         # print("rev", cur_i, rev_bits(cur_i, 5))
-                        cur_i.next = di - length + 1
+                        cur_i.next = di - mlength + 1
                         outcode = (rev_bits(cur_i, 5) | (extra_dist << 5))
                         if extra_bits <= 4:
                             # print("outcode", outcode)
@@ -729,25 +737,22 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
             elif state == d_state.SEARCHF:
 
                 if FAST and COMPRESS:
-                    lfmatch = length
+                    lfmatch = dlength
                     distance = lfmatch + 1
                     # print("FSEARCH", distance)
                     fmatch2 = di - lfmatch + 2
                     # Length is 3 code
-                    lencode = 257
                     match = 3
                     mdone = True
 
                     if di < isize - 4 and \
                             iram[fmatch2 & IBS] == b4:
-                        lencode = 258
                         match = 4
                         if fcount < 5:
                             mdone = False
                             # print("fcount", fcount)
                         elif di < isize - 5 and \
                                 iram[fmatch2+1 & IBS] == b5:
-                            lencode = 259
                             match = 5
                             if MATCH10:
                               if fcount < 6:
@@ -755,35 +760,30 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
                                   # print("fcount", fcount)
                               elif di < isize - 6 and \
                                     iram[fmatch2+2 & IBS] == b6:
-                                lencode = 260
                                 match = 6
                                 if fcount < 7:
                                     mdone = False
                                     # print("fcount", fcount)
                                 elif di < isize - 7 and \
                                         iram[fmatch2+3 & IBS] == b7:
-                                    lencode = 261
                                     match = 7
                                     if fcount < 8:
                                         mdone = False
                                         # print("fcount", fcount)
                                     elif di < isize - 8 and \
                                             iram[fmatch2+4 & IBS] == b8:
-                                        lencode = 262
                                         match = 8
                                         if fcount < 9:
                                             mdone = False
                                             # print("fcount", fcount)
                                         elif di < isize - 9 and \
                                                 iram[fmatch2+5 & IBS] == b9:
-                                            lencode = 263
                                             match = 9
                                             if fcount < 10:
                                                 mdone = False
                                                 # print("fcount", fcount)
                                             elif di < isize - 10 and \
                                                     iram[fmatch2+6 & IBS] == b10:
-                                                lencode = 264
                                                 match = 10
 
                     if mdone:
@@ -793,8 +793,7 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
                         do_init.next = True
                         # adv(match * 8)
                         di.next = di + match
-                        cur_cstatic.next = cur_cstatic + match - 1
-                        length.next = match
+                        mlength.next = match
                         state.next = d_state.DISTANCE
 
             elif state == d_state.SEARCH:
@@ -821,7 +820,7 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
                                 cur_search.next = -1
                                 # print("NO FSEARCH")
                             else:
-                                length.next = fmatch
+                                dlength.next = fmatch
                                 state.next = d_state.SEARCHF
 
                         elif not FAST and iram[cur_search & IBS] == b1 and \
@@ -874,13 +873,12 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
                 if mdone:
                     match = more - 1
                     distance = di - cur_search
-                    print("d/l", distance, match)
+                    # print("d/l", distance, match)
                     cur_dist.next = distance
                     do_init.next = True
                     # adv(match * 8)
                     di.next = di + match
-                    cur_cstatic.next = cur_cstatic + match - 1
-                    length.next = match
+                    mlength.next = match
                     state.next = d_state.DISTANCE
 
             elif state == d_state.STATIC:

@@ -179,102 +179,103 @@ class TestDeflate(unittest.TestCase):
                       (now() - start) // 10, wait)
                 sresult = b''.join(sresult)
                 self.assertEqual(b_data, sresult)
-                # self.assertEqual(b_data[:100000], sresult[:100000])
                 print("Decompress OK!")
 
-            print("==========STREAMING COMPRESS TEST=========")
+            if COMPRESS:
+                print("==========STREAMING COMPRESS TEST=========")
 
-            print("CLEAR OLD INPUT")
-            i_mode.next = WRITE
-            i_waddr.next = 0
-            i_raddr.next = 0
-            tick()
-            yield delay(5)
-            tick()
-            yield delay(5)
+                print("CLEAR OLD INPUT")
+                i_mode.next = WRITE
+                i_waddr.next = 0
+                i_raddr.next = 0
+                tick()
+                yield delay(5)
+                tick()
+                yield delay(5)
 
-            print("STARTC")
-            i_mode.next = STARTC
-            tick()
-            yield delay(5)
-            tick()
-            yield delay(5)
+                print("STARTC")
+                i_mode.next = STARTC
+                tick()
+                yield delay(5)
+                tick()
+                yield delay(5)
 
-            print("WRITE")
-            i = 0
-            ri = 0
-            slen = 10000
-            sresult = []
-            wait = 0
-            start = now()
-            while True:
-                if ri < o_oprogress:
-                    did_read = 1
-                    # print("do read", ri, o_oprogress)
-                    i_mode.next = READ
-                    i_raddr.next = ri
-                    tick()
-                    yield delay(5)
-                    tick()
-                    yield delay(5)
-                    if ri % 10000 == 0:
-                        print(ri)
-                    ri = ri + 1
-                else:
-                    did_read = 0
-
-                if len(b_data) < 4 and i == 0:
-                    """
-                    Short length input, just write 4 bytes.
-                    This is an API limitation!
-                    """
-                    print("SHORT INPUT")
-                    i_mode.next = WRITE
-                    i_waddr.next = 4
-                    i_data.next = 0
-                    i = 1
-                elif i < slen and len(b_data) > 0:
-                    if o_iprogress > i - MAXW:
-                        i_mode.next = WRITE
-                        i_waddr.next = i
-                        i_data.next = b_data[i % len(b_data)]
-                        # print("write", i, b_data[i % len(b_data)])
-                        i = i + 1
+                print("WRITE")
+                i = 0
+                ri = 0
+                slen = 10000
+                sresult = []
+                wait = 0
+                start = now()
+                while True:
+                    if ri < o_oprogress:
+                        did_read = 1
+                        # print("do read", ri, o_oprogress)
+                        i_mode.next = READ
+                        i_raddr.next = ri
+                        tick()
+                        yield delay(5)
+                        tick()
+                        yield delay(5)
+                        if ri % 2500 == 0:
+                            print(ri)
+                        ri = ri + 1
                     else:
-                        # print("Wait for space", i)
-                        wait += 1
-                else:
-                    i_mode.next = IDLE
+                        did_read = 0
 
-                tick()
-                yield delay(5)
-                tick()
-                yield delay(5)
+                    if len(b_data) < 4 and i == 0:
+                        """
+                        Short length input, just write 4 bytes.
+                        This is an API limitation!
+                        """
+                        print("SHORT INPUT")
+                        i_mode.next = WRITE
+                        i_waddr.next = 4
+                        i_data.next = 0
+                        i = 1
+                    elif i < slen and len(b_data) > 0:
+                        if o_iprogress > i - MAXW:
+                            i_mode.next = WRITE
+                            i_waddr.next = i
+                            i_data.next = b_data[i % len(b_data)]
+                            # print("write", i, b_data[i % len(b_data)])
+                            i = i + 1
+                        else:
+                            # print("Wait for space", i)
+                            wait += 1
+                    else:
+                        i_mode.next = IDLE
 
-                if did_read:
-                    # print("read", ri, o_oprogress, o_byte)
-                    sresult.append(bytes([o_byte]))
+                    tick()
+                    yield delay(5)
+                    tick()
+                    yield delay(5)
 
-                if o_done:
-                    # print("DONE", o_oprogress, ri)
-                    if o_oprogress == ri:
-                        break;
+                    if did_read:
+                        # print("read", ri, o_oprogress, o_byte)
+                        sresult.append(bytes([o_byte]))
 
-            i_mode.next = IDLE
+                    if o_done:
+                        # print("DONE", o_oprogress, ri)
+                        if o_oprogress == ri:
+                            break;
 
-            print("IN/OUT/CYCLES/WAIT", slen, len(sresult),
-                  (now() - start) // 10, wait)
-            sresult = b''.join(sresult)
-            print("zlib test:", zlib.decompress(sresult)[:130])
-            rlen = min(len(b_data), slen)
-            self.assertEqual(zlib.decompress(sresult)[:rlen], b_data[:rlen])
+                i_mode.next = IDLE
+
+                print("IN/OUT/CYCLES/WAIT", slen, len(sresult),
+                    (now() - start) // 10, wait)
+                sresult = b''.join(sresult)
+                print("zlib test:", zlib.decompress(sresult)[:130])
+                rlen = min(len(b_data), slen)
+                self.assertEqual(zlib.decompress(sresult)[:rlen], b_data[:rlen])
+
             print("DONE!")
 
 
         for loop in range(1):
             # for mode in range(8):
-            # for mode in range(6):
-            for mode in range(4):
+            for mode in range(7):
+            # for mode in range(4):
                 self.runTests(test_decompress)
 
     def runTests(self, test):

@@ -4,15 +4,13 @@ import zlib
 import random
 import urllib.request
 
-from math import log2
-
 from myhdl import delay, now, Signal, intbv, ResetSignal, Simulation, \
                   Cosimulation, block, instance, StopSimulation, modbv, \
                   always, always_seq, always_comb, enum, Error
 
 from deflate import IDLE, WRITE, READ, STARTC, STARTD, LBSIZE, IBSIZE, \
                     CWINDOW, COMPRESS, DECOMPRESS, OBSIZE, LMAX, LIBSIZE, \
-                    DYNAMIC, OBSIZE
+                    DYNAMIC, LOBSIZE
 
 MAXW = CWINDOW
 
@@ -70,8 +68,7 @@ def test_data(m, tlen=100, limit=False):
     if limit:
         b_data = b_data[:IBSIZE - 4 - 10]
     if not DYNAMIC:
-        # co = zlib.compressobj(strategy=zlib.Z_FIXED,wbits=int(log2(OBSIZE)))
-        co = zlib.compressobj(strategy=zlib.Z_FIXED)
+        co = zlib.compressobj(strategy=zlib.Z_FIXED,wbits=LOBSIZE)
         data1 = co.compress(b_data)
         data2 = co.flush()
         zl_data = data1 + data2
@@ -98,7 +95,7 @@ class TestDeflate(unittest.TestCase):
             print("START TEST MODE", mode, tloop)
             print("==========================")
 
-            b_data, zl_data = test_data(mode, 25000)
+            b_data, zl_data = test_data(mode, 2500)
 
             if mode == 0:
                 reset.next = 0

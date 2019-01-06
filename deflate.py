@@ -43,8 +43,8 @@ else:
     CWINDOW = 32
 
 OBSIZE = 8192   # Size of output buffer (BRAM)
-OBSIZE = 1024   # Size of output buffer (BRAM)
 OBSIZE = 32768  # Size of output buffer for ANY input (BRAM)
+OBSIZE = 1024   # Size of output buffer (BRAM)
 
 # Size of input buffer (LUT-RAM)
 if FAST:
@@ -522,8 +522,10 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
                 # Read block header
                 elif first_block:
                     first_block.next = False
-                    #print(iram[di & IBS])
-                    #if iram[di & IBS] == 0x78:
+                    """
+                    We skip this test because smaller windows give
+                    another header
+
                     if b1 == 0x78:
                         print("deflate mode")
                     else:
@@ -531,6 +533,7 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
                         raise Error("unexpected mode")
                         o_done.next = True
                         state.next = d_state.IDLE
+                    """
                     adv(16)
                 else:
                     if get4(0, 1):

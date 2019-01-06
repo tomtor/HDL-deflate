@@ -29,8 +29,8 @@ DYNAMIC = True
 MATCH10 = False
 MATCH10 = True
 
-FAST = False
 FAST = True
+FAST = False
 
 # Search window for compression
 if FAST:
@@ -38,8 +38,8 @@ if FAST:
 else:
     CWINDOW = 256
 
-OBSIZE = 8192   # Size of output buffer (BRAM)
 OBSIZE = 32768  # Size of output buffer for ANY input (BRAM)
+OBSIZE = 8192   # Size of output buffer (BRAM)
 
 # Size of input buffer (LUT-RAM)
 if FAST:
@@ -222,7 +222,6 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
     cur_cstatic = Signal(intbv()[LMAX:])
     cur_search = Signal(intbv(min=-1,max=1<<LMAX))
     more = Signal(intbv()[4:])
-    moreb = Signal(intbv()[8:])
     cur_dist = Signal(intbv(min=-CWINDOW,max=IBSIZE))
     cur_next = Signal(intbv()[5:])
 
@@ -252,20 +251,15 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
     b14._markUsed()
     b15 = ConcatSignal(b1, b2, b3, b4, b5)
 
+    b6 = Signal(intbv()[8:])
+    b7 = Signal(intbv()[8:])
+    b8 = Signal(intbv()[8:])
+    b9 = Signal(intbv()[8:])
+    b10 = Signal(intbv()[8:])
     if MATCH10:
-        b6 = Signal(intbv()[8:])
-        b7 = Signal(intbv()[8:])
-        b8 = Signal(intbv()[8:])
-        b9 = Signal(intbv()[8:])
-        b10 = Signal(intbv()[8:])
         b110 = ConcatSignal(b1, b2, b3, b4, b5, b6, b7, b8, b9, b10)
         b110._markUsed()
     else:
-        b6 = Signal(bool())
-        b7 = Signal(bool())
-        b8 = Signal(bool())
-        b9 = Signal(bool())
-        b10 = Signal(bool())
         b110 = Signal(bool())
 
     fcount = Signal(intbv()[4:])
@@ -395,10 +389,12 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
             filled.next = False
 
     def put(d, width):
+        """
         if width > 9:
             raise Error("width > 9")
         if d > ((1 << width) - 1):
             raise Error("too big")
+        """
         # print("put:", d, width, do, doo, ob1, (ob1 | (d << doo)))
         obyte.next = (ob1 | (d << doo)) & 0xFF
         oaddr.next = do
@@ -429,11 +425,13 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
         do.next = do + 1
 
     def rev_bits(b, nb):
+        """
         if b >= 1 << nb:
             raise Error("too few bits")
             print("too few bits")
         if nb > 15:
             raise Error("nb too large")
+        """
         r = (((b >> 14) & 0x1) << 0) | (((b >> 13) & 0x1) << 1) | \
             (((b >> 12) & 0x1) << 2) | (((b >> 11) & 0x1) << 3) | \
             (((b >> 10) & 0x1) << 4) | (((b >> 9) & 0x1) << 5) | \
@@ -446,10 +444,12 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
         return r
 
     def makeLeaf(lcode, lbits):
+        """
         if lcode >= 1 << CODEBITS:
             raise Error("code too big")
         if lbits >= 1 << BITBITS:
             raise Error("bits too big")
+        """
         return (lcode << BITBITS) | lbits
 
     def get_bits(aleaf):
@@ -827,7 +827,6 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
                                 iram[cur_search + 1 & IBS] == b2 and \
                                 iram[cur_search + 2 & IBS] == b3:
                                 more.next = 4
-                                # moreb.next = iram[cur_search + 3 & IBS]
                                 state.next = d_state.SEARCH10
 
                         else:
@@ -845,26 +844,27 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
             elif state == d_state.SEARCH10:
 
                 mdone = True
-                # print("more/fcount", more, fcount)
-                limit = 5
+                mlimit = 5
                 if MATCH10:
-                    limit = 10
-                if more <= limit:
+                    mlimit = 10
+                # print("more/fcount", more, fcount)
+                if more <= mlimit:
                     if fcount < more:
                         raise Error("???")
                     cbyte = b4
                     if more == 5:
                         cbyte = b5
-                    elif more == 6:
-                        cbyte = b6
-                    elif more == 7:
-                        cbyte = b7
-                    elif more == 8:
-                        cbyte = b8
-                    elif more == 9:
-                        cbyte = b9
-                    elif more == 10:
-                        cbyte = b10
+                    elif MATCH10:
+                        if more == 6:
+                            cbyte = b6
+                        elif more == 7:
+                            cbyte = b7
+                        elif more == 8:
+                            cbyte = b8
+                        elif more == 9:
+                            cbyte = b9
+                        elif more == 10:
+                            cbyte = b10
 
                     if di < isize - more and iram[cur_search + more - 1 & IBS] == cbyte:
                         more.next = more + 1

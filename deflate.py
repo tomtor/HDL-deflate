@@ -18,8 +18,8 @@ from myhdl import always, block, Signal, intbv, Error, ResetSignal, \
 IDLE, RESET, WRITE, READ, STARTC, STARTD = range(6)
 
 # Trade speed for LUTs
-LOWLUT=True
 LOWLUT=False
+LOWLUT=True
 
 # set options manually
 COMPRESS = False
@@ -31,11 +31,11 @@ DECOMPRESS = True
 DYNAMIC = True
 DYNAMIC = False
 
-MATCH10 = False
 MATCH10 = True
+MATCH10 = False
 
-FAST = False
 FAST = True
+FAST = False
 
 if LOWLUT:
     DYNAMIC = False
@@ -53,9 +53,8 @@ else:
     CWINDOW = 256
     CWINDOW = 32
 
-OBSIZE = 8192   # Size of output buffer (BRAM)
 OBSIZE = 32768  # Size of output buffer for ANY input (BRAM)
-OBSIZE = 1024   # Size of output buffer (BRAM)
+OBSIZE = 512    # Minimal size of output buffer (BRAM)
 
 # Size of input buffer (LUT-RAM)
 if FAST:
@@ -171,8 +170,12 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
     b_numCodeLength = Signal(intbv()[9:])
 
     CodeLengths = 19
-    MaxCodeLength = 15
-    InstantMaxBit = 10
+    if DYNAMIC:
+        MaxCodeLength = 15
+        InstantMaxBit = 10
+    else:
+        MaxCodeLength = 9
+        InstantMaxBit = 9
     EndOfBlock = 256
     MaxBitLength = 288
     # MaxToken = 285
@@ -226,11 +229,11 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
 
     static = Signal(bool())
 
-    code = Signal(intbv()[15:])
-    lastToken = Signal(intbv()[15:])
+    code = Signal(intbv()[CODEBITS:])
+    lastToken = Signal(intbv()[9:])
     howOften = Signal(intbv()[9:])
 
-    cur_i = Signal(intbv()[LMAX:])
+    cur_i = Signal(intbv()[LOBSIZE:])
     spread_i = Signal(intbv()[9:])
     cur_HF1 = Signal(intbv()[MaxCodeLength+1:])
     cur_static = Signal(intbv()[9:])
@@ -353,7 +356,7 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
                     else:
                         cwindow.next = (cwindow << shift) | (b15 >> (40 - shift))
 
-                # print("B1", iram[di & IBS])
+                # print("old di fcount", old_di, di, fcount)
                 if not LOWLUT:
                     b1.next = iram[di & IBS]
                     b2.next = iram[di+1 & IBS]
@@ -609,7 +612,7 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
                         prev_method.next = hm
                         print("set prev", hm)
                     else:
-                        static.next = True
+                        # static.next = True
                         method.next = 1
                         cur_next.next = 0
                         adv(3)
@@ -889,10 +892,7 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
 
             elif state == d_state.SEARCH10:
 
-                if LOWLUT and more != 6 and more > fcount:
                     print("SEARCH10", more, fcount)
-                    pass
-                else:
                     mdone = True
                     mlimit = 5
                     if MATCH10:
@@ -921,7 +921,7 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
                     if mdone:
                         match = more - 1
                         distance = di - cur_search
-                        # print("d/l", distance, match)
+                        print("d/l", distance, match)
                         cur_dist.next = distance
                         do_init.next = True
                         # adv(match * 8)
@@ -1386,7 +1386,7 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
 
                 if not DECOMPRESS:
                     pass
-                elif LOWLUT and fcount < 2:
+                elif LOWLUT and fcount < 3:
                     # print("INFLATE fc", fcount)
                     pass
                 elif method == 1 and not filled:
@@ -1425,7 +1425,7 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
                     elif code == InvalidToken:
                         raise Error("invalid token")
                     else:
-                        if static:
+                        if not DYNAMIC or static:
                             token = code - 257
                             # print("E:", token)
                             tlength = CopyLength[token]
@@ -1467,7 +1467,7 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
                 elif di >= isize - 2:
                     # print("HOLD2")
                     pass
-                elif method == 0:
+                elif DYNAMIC and method == 0:
                     if not filled:
                         # print("COPY !F")
                         filled.next = True

@@ -1,4 +1,4 @@
-PYTHON=python3
+PYTHON=python3.6
 
 MODULES=deflate.py test_deflate.py
 

@@ -346,7 +346,8 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
         else:
             if isize < 4:
                 nb.next = 0
-                # old_di.next = 0
+                if FAST:
+                    old_di.next = 0
             elif i_mode == STARTC or i_mode == STARTD:
                 nb.next = 0
                 if FAST:
@@ -582,6 +583,8 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
                         if get4(0, 1):
                             print("final")
                             final.next = True
+                        else:
+                            final.next = False
                     if DYNAMIC:
                         hm = get4(1, 2)
                         method.next = hm
@@ -661,7 +664,7 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
                 elif cur_cstatic == 2:
                     put(0x3, 3)
                 elif flush:
-                    print("flush", do, ob1)
+                    # print("flush", do, ob1)
                     no_adv = 1
                     oaddr.next = do
                     obyte.next = ob1
@@ -1408,6 +1411,7 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
                     # print("INFLATE fc", fcount)
                     pass
                 elif method == 1 and not filled:
+                # elif not filled:
                     # print("INFLATE !F")
                     filled.next = True
                 elif di >= isize - 4 and not i_mode == IDLE:
@@ -1492,12 +1496,14 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
                     elif copy_i < length:
                         oaddr.next = do
                         obyte.next = b3
-                        adv(8)
+                        # adv(8)
+                        di.next = di + 1
                         copy_i.next = copy_i + 1
                         do.next = do + 1
                         o_oprogress.next = do + 1
                     elif not ONEBLOCK and not final:
-                        adv(16)
+                        # adv(16)
+                        di.next = di + 2
                         state.next = d_state.HEADER
                         filled.next = False
                         print("new block")

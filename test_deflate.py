@@ -95,13 +95,13 @@ class TestDeflate(unittest.TestCase):
           def tick():
               clk.next = not clk
 
-          for tloop in range(1):
+          for tloop in range(2):
             print("")
             print("==========================")
             print("START TEST MODE", mode, tloop)
             print("==========================")
 
-            b_data, zl_data = test_data(mode, 100 if not LOWLUT else 100)
+            b_data, zl_data = test_data(mode, 25000 if not LOWLUT else 1000)
 
             if mode == 0:
                 reset.next = 0
@@ -215,7 +215,7 @@ class TestDeflate(unittest.TestCase):
                 print("WRITE")
                 i = 0
                 ri = 0
-                slen = 100
+                slen = 10000
                 sresult = []
                 wait = 0
                 start = now()
@@ -277,7 +277,10 @@ class TestDeflate(unittest.TestCase):
                 print("IN/OUT/CYCLES/WAIT", slen, len(sresult),
                     (now() - start) // 10, wait)
                 sresult = b''.join(sresult)
+                print("len sresult", len(sresult))
                 rlen = min(len(b_data), slen)
+                print("rlen", rlen)
+                print(sresult)
                 self.assertEqual(zlib.decompress(sresult)[:rlen], b_data[:rlen])
                 print("zlib test:", zlib.decompress(sresult)[:130])
 
@@ -285,9 +288,9 @@ class TestDeflate(unittest.TestCase):
 
 
         for loop in range(1):
-            for mode in range(1,2):
+            # for mode in range(1,2):
             # for mode in range(8):
-            # for mode in range(6):
+            for mode in range(6):
             # for mode in range(4):
                 self.runTests(test_decompress)
 

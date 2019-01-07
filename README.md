@@ -65,12 +65,18 @@ until the test fails.
 
 FAST MATCH10 compress only has quite good resource usage.
 
+LOWLUT disables some options (DYNAMIC and multi block handling) for minimal LUT usage.
+
 ## Practical considerations
 
 In general HDL-Deflate is interesting when speed is important. When speed is not a real issue using a (soft)
-CPU with zlib is probably the better approach. Especially decompression is also reasonable fast with a CPU and HDL-Deflate
-needs a lot of BRAM when configured to decompress ANY deflate input stream. Compression is another story because it
-is a LOT faster in hardware with the `FAST` option and uses a reasonable amount of LUTs.
+CPU with zlib and dynamic RAM is probably the better approach. Especially decompression is also reasonable
+fast with a CPU and HDL-Deflate needs a lot of BRAM when configured to decompress ANY deflate input stream.
+
+Compression is another story because it is a LOT faster in hardware with the `FAST` option and uses a reasonable amount of LUTs.
+
+Decompression only mode with the LOWLUT option can be interesting because it also has a reasonable size (comparable
+with a soft CPU).
 
 # FPGA validation
 
@@ -119,14 +125,14 @@ LUTRAM	|48
 FF	|2491
 BRAM	|32.5
 
-## Compress False and Dynamic False
+## Compress False and LOWLUT
 
 Resource|Estimation
 --------|----------
-LUT	|2535
-LUTRAM	|48
-FF	|1094
-BRAM	|16.5
+LUT	|2157
+LUTRAM	|36
+FF	|858
+BRAM	|1.5
 
 ## Speed
 
@@ -135,7 +141,7 @@ Non FAST passes timing constraints for 100 Mhz.
 
 # Future Improvements (when there is interest)
 
-* Reduce LUT usage: Try to fit in a Lattice ultra plus 5k
+* ~~Reduce LUT usage: Try to fit in a Lattice ultra plus 5k~~
 * ~~Improve speed from current 80Mhz to 100Mhz~~
 * ~~Improve compression performance~~
 * Handle compress input streams < 4 bytes

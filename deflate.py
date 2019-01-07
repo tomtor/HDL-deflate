@@ -17,9 +17,9 @@ from myhdl import always, block, Signal, intbv, Error, ResetSignal, \
 
 IDLE, RESET, WRITE, READ, STARTC, STARTD = range(6)
 
-# Trade speed for LUTs
-LOWLUT=False
+# Trade speed and functionality (DYNAMIC trees) for LUTs
 LOWLUT=True
+LOWLUT=False
 
 # set options manually
 COMPRESS = False
@@ -28,30 +28,33 @@ COMPRESS = True
 DECOMPRESS = False
 DECOMPRESS = True
 
-DYNAMIC = True
 DYNAMIC = False
+DYNAMIC = True
 
-MATCH10 = True
 MATCH10 = False
+MATCH10 = True
 
-FAST = True
 FAST = False
+FAST = True
+
+ONEBLOCK = True
+ONEBLOCK = False
 
 if LOWLUT:
     DYNAMIC = False
     MATCH10 = False
     FAST = False
+    ONEBLOCK = True
 
 if not COMPRESS:
     MATCH10 = False
     FAST = False
 
 # Search window for compression
-if FAST:
+if FAST or LOWLUT:
     CWINDOW = 32
 else:
     CWINDOW = 256
-    CWINDOW = 32
 
 OBSIZE = 32768  # Size of output buffer for ANY input (BRAM)
 OBSIZE = 512    # Minimal size of output buffer (BRAM)
@@ -62,7 +65,11 @@ if FAST:
 else:
     IBSIZE = 2 * CWINDOW   # Minimal window
 
-LMAX = 24       # Size of progress and I/O counters
+# Size of progress and I/O counters
+if LOWLUT:
+    LMAX = 16
+else:
+    LMAX = 24
 
 
 if OBSIZE > IBSIZE:
@@ -173,9 +180,12 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
     if DYNAMIC:
         MaxCodeLength = 15
         InstantMaxBit = 10
+        copy_i = Signal(intbv()[LOBSIZE:])
     else:
         MaxCodeLength = 9
         InstantMaxBit = 9
+        copy_i = Signal(intbv()[15:])
+
     EndOfBlock = 256
     MaxBitLength = 288
     # MaxToken = 285
@@ -233,7 +243,7 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
     lastToken = Signal(intbv()[9:])
     howOften = Signal(intbv()[9:])
 
-    cur_i = Signal(intbv()[LOBSIZE:])
+    cur_i = Signal(intbv()[LMAX:])
     spread_i = Signal(intbv()[9:])
     cur_HF1 = Signal(intbv()[MaxCodeLength+1:])
     cur_static = Signal(intbv()[9:])
@@ -336,10 +346,11 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
         else:
             if isize < 4:
                 nb.next = 0
-                old_di.next = 0
+                # old_di.next = 0
             elif i_mode == STARTC or i_mode == STARTD:
                 nb.next = 0
-                old_di.next = 0
+                if FAST:
+                    old_di.next = 0
             else:
                 """
                 if do_compress:
@@ -357,8 +368,8 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
                         cwindow.next = (cwindow << shift) | (b15 >> (40 - shift))
 
                 # print("old di fcount", old_di, di, fcount)
+                b1.next = iram[di & IBS]
                 if not LOWLUT:
-                    b1.next = iram[di & IBS]
                     b2.next = iram[di+1 & IBS]
                     b3.next = iram[di+2 & IBS]
 
@@ -405,7 +416,6 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
                     # print("fcount set", fcount)
                     if LOWLUT:
                         fcount.next = 1
-                        b1.next = iram[di & IBS]
                     else:
                         fcount.next = 4
                         b4.next = iram[di+3 & IBS]
@@ -506,7 +516,7 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
             print("DEFLATE RESET")
             state.next = d_state.IDLE
             o_done.next = False
-            prev_method.next = 3  # Illegal value
+            # prev_method.next = 3  # Illegal value
         else:
 
             if state == d_state.IDLE:
@@ -568,9 +578,10 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
                         o_done.next = True
                         state.next = d_state.IDLE
                 else:
-                    if get4(0, 1):
-                        print("final")
-                        final.next = True
+                    if not ONEBLOCK:
+                        if get4(0, 1):
+                            print("final")
+                            final.next = True
                     if DYNAMIC:
                         hm = get4(1, 2)
                         method.next = hm
@@ -603,7 +614,7 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
                                 skip = 16 - dio
                             length.next = get4(skip, 16)
                             adv(skip + 16)
-                            cur_i.next = 0
+                            copy_i.next = 0
                             offset.next = 7
                         else:
                             state.next = d_state.IDLE
@@ -615,7 +626,10 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
                         # static.next = True
                         method.next = 1
                         cur_next.next = 0
-                        adv(3)
+                        if ONEBLOCK:
+                            dio.next = 3
+                        else:
+                            adv(3)
                         prev_method.next = 1
                         if prev_method == 1:
                             print("skip HF init")
@@ -647,7 +661,7 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
                 elif cur_cstatic == 2:
                     put(0x3, 3)
                 elif flush:
-                    # print("flush", do, ob1)
+                    print("flush", do, ob1)
                     no_adv = 1
                     oaddr.next = do
                     obyte.next = ob1
@@ -671,7 +685,7 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
                             obyte.next = ob1
                             do.next = do + 1
                     elif cur_cstatic == isize + 6:
-                        print("c1")
+                        print("c1", adler2)
                         oaddr.next = do
                         obyte.next = adler2 >> 8
                         do.next = do + 1
@@ -683,7 +697,7 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
                         do.next = do + 1
                         o_oprogress.next = do + 1
                     elif cur_cstatic == isize + 8:
-                        print("c3")
+                        print("c3", adler1)
                         oaddr.next = do
                         obyte.next = adler1 >> 8
                         do.next = do + 1
@@ -847,7 +861,7 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
                 if not COMPRESS:
                     pass
                 elif LOWLUT and fcount < 3:
-                    print("SEARCH", fcount)
+                    # print("SEARCH", fcount)
                     pass
                 else:
                     # print("cs",  cur_search, di, di - CWINDOW)
@@ -882,6 +896,7 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
                             cur_search.next = cur_search - 1
                     else:
                         bdata = b1  # iram[di]
+                        # print("B1", b1)
                         # adv(8)
                         di.next = di + 1
                         outlen = codeLength[bdata]
@@ -892,7 +907,7 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
 
             elif state == d_state.SEARCH10:
 
-                    print("SEARCH10", more, fcount)
+                    # print("SEARCH10", more, fcount)
                     mdone = True
                     mlimit = 5
                     if MATCH10:
@@ -942,9 +957,12 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
                 numCodeLength.next = 288
                 if do_compress:
                     state.next = d_state.CSTATIC
-                else:
+                elif DYNAMIC:
                     cur_HF1.next = 0
                     state.next = d_state.HF1
+                else:
+                    cur_i.next = 0
+                    state.next = d_state.HF1INIT
 
             elif state == d_state.BL:
 
@@ -1065,7 +1083,7 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
 
             elif state == d_state.HF1:
 
-                if DECOMPRESS:
+                if DECOMPRESS and DYNAMIC:
                     if cur_HF1 < len(bitLengthCount):
                         bitLengthCount[cur_HF1].next = 0
                     if cur_HF1 < len(d_leaves) and DYNAMIC:
@@ -1378,7 +1396,7 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
                     offset.next = (do - distance) & OBS
                     length.next = tlength
                     # cur_next.next = 0
-                    cur_i.next = 0
+                    copy_i.next = 0
                     oraddr.next = do - distance
                     state.next = d_state.COPY
 
@@ -1405,7 +1423,7 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
                     raise Error("NO EOF!")
                 elif code == EndOfBlock:
                     print("EOF:", di, do)
-                    if not final:
+                    if not ONEBLOCK and not final:
                         state.next = d_state.HEADER
                         filled.next = False
                         print("New Block!")
@@ -1447,7 +1465,7 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
                             # print("adv", extraLength + 5 + moreBits)
                             offset.next = (do - distance) & OBS
                             length.next = tlength
-                            cur_i.next = 0
+                            copy_i.next = 0
                             oraddr.next = do - distance
                             state.next = d_state.COPY
                         else:
@@ -1461,8 +1479,8 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
 
                 if not DECOMPRESS:
                     pass
-                elif cur_i == 0 and do + length >= i_raddr + OBSIZE:
-                    # print("HOLDW", length, offset, cur_i, do, i_raddr)
+                elif copy_i == 0 and do + length >= i_raddr + OBSIZE:
+                    # print("HOLDW", length, offset, copy_i, do, i_raddr)
                     pass
                 elif di >= isize - 2:
                     # print("HOLD2")
@@ -1471,14 +1489,14 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
                     if not filled:
                         # print("COPY !F")
                         filled.next = True
-                    elif cur_i < length:
+                    elif copy_i < length:
                         oaddr.next = do
                         obyte.next = b3
                         adv(8)
-                        cur_i.next = cur_i + 1
+                        copy_i.next = copy_i + 1
                         do.next = do + 1
                         o_oprogress.next = do + 1
-                    elif not final:
+                    elif not ONEBLOCK and not final:
                         adv(16)
                         state.next = d_state.HEADER
                         filled.next = False
@@ -1486,38 +1504,38 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
                     else:
                         o_done.next = True
                         state.next = d_state.IDLE
-                elif cur_i < length + 2:
+                elif copy_i < length + 2:
                     # print("L/O", length, offset, do)
-                    oraddr.next = offset + cur_i
-                    if cur_i == 1:
+                    oraddr.next = offset + copy_i
+                    if copy_i == 1:
                         off1.next = (offset == (do - 1) & OBS)
                         off2.next = (offset == (do - 2) & OBS)
                         copy1.next = orbyte
-                        # print("c1", cur_i, length, offset, do, orbyte)
-                    if cur_i == 3:
+                        # print("c1", copy_i, length, offset, do, orbyte)
+                    if copy_i == 3:
                         copy2.next = orbyte
-                    if cur_i > 1:
+                    if copy_i > 1:
                         # Special 1 byte offset handling:
-                        # if (offset + cur_i) & OBS == (do + 1) & OBS:
+                        # if (offset + copy_i) & OBS == (do + 1) & OBS:
                         if off1:
                             # print("1 byte", do)
                             obyte.next = copy1
-                        # elif cur_i == 3 or (offset + cur_i) & OBS != do & OBS:
-                        elif cur_i == 3 or not off2:
+                        # elif copy_i == 3 or (offset + copy_i) & OBS != do & OBS:
+                        elif copy_i == 3 or not off2:
                             obyte.next = orbyte
                         # Special 2 byte offset handling:
-                        elif cur_i > 2:
+                        elif copy_i > 2:
                             # print("2 byte", do)
-                            if cur_i & 1:
+                            if copy_i & 1:
                                 obyte.next = copy2
                             else:
                                 obyte.next = copy1
-                        else:  # cur_i == 2
+                        else:  # copy_i == 2
                             obyte.next = copy1
                         oaddr.next = do
                         o_oprogress.next = do + 1
                         do.next = do + 1
-                    cur_i.next = cur_i + 1
+                    copy_i.next = copy_i + 1
                 else:
                     cur_next.next = 0
                     state.next = d_state.NEXT

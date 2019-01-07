@@ -10,7 +10,7 @@ from myhdl import delay, now, Signal, intbv, ResetSignal, Simulation, \
 
 from deflate import IDLE, WRITE, READ, STARTC, STARTD, LBSIZE, IBSIZE, \
                     CWINDOW, COMPRESS, DECOMPRESS, OBSIZE, LMAX, LIBSIZE, \
-                    DYNAMIC, LOBSIZE
+                    DYNAMIC, LOBSIZE, LOWLUT
 
 MAXW = CWINDOW
 
@@ -69,11 +69,11 @@ def test_data(m, tlen=100, limit=False):
         b_data = b_data[:IBSIZE - 4 - 10]
     if not DYNAMIC:
         co = zlib.compressobj(strategy=zlib.Z_FIXED,wbits=LOBSIZE)
-        data1 = co.compress(b_data)
-        data2 = co.flush()
-        zl_data = data1 + data2
     else:
-        zl_data = zlib.compress(b_data)
+        co = zlib.compressobj(wbits=LOBSIZE)
+    data1 = co.compress(b_data)
+    data2 = co.flush()
+    zl_data = data1 + data2
     print("From %d to %d bytes" % (len(b_data), len(zl_data)))
     print(zl_data[:500])
     return b_data, zl_data
@@ -95,7 +95,7 @@ class TestDeflate(unittest.TestCase):
             print("START TEST MODE", mode, tloop)
             print("==========================")
 
-            b_data, zl_data = test_data(mode, 2500)
+            b_data, zl_data = test_data(mode, 2500 if not LOWLUT else 100)
 
             if mode == 0:
                 reset.next = 0
@@ -129,7 +129,6 @@ class TestDeflate(unittest.TestCase):
                 print("WRITE")
                 i = 0
                 ri = 0
-                first = 1
                 sresult = []
                 start = now()
                 wait = 0
@@ -174,7 +173,7 @@ class TestDeflate(unittest.TestCase):
                     if o_done:
                         # print("DONE", o_oprogress, ri)
                         if o_oprogress == ri:
-                            break;
+                            break
 
                 i_mode.next = IDLE
                 tick()
@@ -280,8 +279,9 @@ class TestDeflate(unittest.TestCase):
 
 
         for loop in range(1):
+            # for mode in range(1,2):
             # for mode in range(8):
-            for mode in range(7):
+            for mode in range(6):
             # for mode in range(4):
                 self.runTests(test_decompress)
 

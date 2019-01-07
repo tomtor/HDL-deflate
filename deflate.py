@@ -17,6 +17,11 @@ from myhdl import always, block, Signal, intbv, Error, ResetSignal, \
 
 IDLE, RESET, WRITE, READ, STARTC, STARTD = range(6)
 
+# Trade speed for LUTs
+LOWLUT=True
+LOWLUT=False
+
+# set options manually
 COMPRESS = False
 COMPRESS = True
 
@@ -29,11 +34,17 @@ DYNAMIC = False
 MATCH10 = False
 MATCH10 = True
 
-FAST = True
 FAST = False
+FAST = True
 
-if not DECOMPRESS:
+if LOWLUT:
+    DYNAMIC = False
     MATCH10 = False
+    FAST = False
+
+if not COMPRESS:
+    MATCH10 = False
+    FAST = False
 
 # Search window for compression
 if FAST:
@@ -152,7 +163,6 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
     method = Signal(intbv()[3:])
     prev_method = Signal(intbv(3)[2:])
     final = Signal(bool())
-    wtick = Signal(bool())
     do_compress = Signal(bool())
 
     numLiterals = Signal(intbv()[9:])
@@ -236,6 +246,8 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
     mlength = Signal(modbv()[4:])
     dlength = Signal(modbv()[10:])
     offset = Signal(intbv()[LOBSIZE:])
+    off1 = Signal(bool())
+    off2 = Signal(bool())
 
     di = Signal(modbv()[LMAX:])
     old_di = Signal(intbv()[LMAX:])
@@ -269,7 +281,6 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
 
     fcount = Signal(intbv()[4:])
 
-    # nb = Signal(intbv()[3:])
     nb = Signal(bool())
 
     filled = Signal(bool())
@@ -343,18 +354,35 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
                         cwindow.next = (cwindow << shift) | (b15 >> (40 - shift))
 
                 # print("B1", iram[di & IBS])
-                b1.next = iram[di & IBS]
-                b2.next = iram[di+1 & IBS]
-                b3.next = iram[di+2 & IBS]
+                if not LOWLUT:
+                    b1.next = iram[di & IBS]
+                    b2.next = iram[di+1 & IBS]
+                    b3.next = iram[di+2 & IBS]
 
                 if old_di == di:
                     """
                     if fcount < 9:
                         print("fcount", fcount)
                     """
-                    nb.next = True
+                    if LOWLUT:
+                        if fcount >= 4:
+                            nb.next = True
+                    else:
+                        nb.next = True
+
                     rb = iram[di + fcount & IBS]
-                    if fcount == 4:
+                    if LOWLUT:
+                        if fcount == 1:
+                            b2.next = rb
+                        elif fcount == 2:
+                            b3.next = rb
+                        elif fcount == 3:
+                            b4.next = rb
+                        elif fcount == 4:
+                            b5.next = rb
+                        if fcount < 5:
+                            fcount.next = fcount + 1
+                    elif fcount == 4:
                         b5.next = rb
                         fcount.next = 5
                     elif MATCH10:
@@ -372,8 +400,12 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
                             fcount.next = fcount + 1
                 else:
                     # print("fcount set", fcount)
-                    fcount.next = 4
-                    b4.next = iram[di+3 & IBS]
+                    if LOWLUT:
+                        fcount.next = 1
+                        b1.next = iram[di & IBS]
+                    else:
+                        fcount.next = 4
+                        b4.next = iram[di+3 & IBS]
 
                 old_di.next = di
 
@@ -499,7 +531,7 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
                     o_done.next = False
                     o_iprogress.next = 0
                     o_oprogress.next = 0
-                    di.next = 0
+                    di.next = 2
                     dio.next = 0
                     # oaddr.next = 0
                     do.next = 0
@@ -520,11 +552,10 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
                 elif not nb:
                     pass
                 # Read block header
-                elif first_block:
+                elif False and first_block:
                     first_block.next = False
-                    """
-                    We skip this test because smaller windows give
-                    another header
+                    # We skip this test because smaller windows give
+                    # another header
 
                     if b1 == 0x78:
                         print("deflate mode")
@@ -533,51 +564,61 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
                         raise Error("unexpected mode")
                         o_done.next = True
                         state.next = d_state.IDLE
-                    """
-                    adv(16)
                 else:
                     if get4(0, 1):
                         print("final")
                         final.next = True
-                    hm = get4(1, 2)
-                    method.next = hm
-                    print("method", hm)
-                    # print(di, dio, nb, b1, b2, b3, b4, hm, isize)
-                    if hm == 2:
-                        if not DYNAMIC:
-                            print("dynamic tree mode disabled")
-                            raise Error("dynamic tree mode disabled")
-                        state.next = d_state.BL
-                        numCodeLength.next = 0
-                        numLiterals.next = 0
-                        static.next = False
-                        adv(3)
-                    elif hm == 1:
+                    if DYNAMIC:
+                        hm = get4(1, 2)
+                        method.next = hm
+                        print("method", hm)
+                        # print(di, dio, nb, b1, b2, b3, b4, hm, isize)
+                        if hm == 2:
+                            if not DYNAMIC:
+                                print("dynamic tree mode disabled")
+                                raise Error("dynamic tree mode disabled")
+                            state.next = d_state.BL
+                            numCodeLength.next = 0
+                            numLiterals.next = 0
+                            static.next = False
+                            adv(3)
+                        elif hm == 1:
+                            static.next = True
+                            cur_static.next = 0
+                            print("prev method is", prev_method)
+                            if prev_method == 1:
+                                print("skip HF init")
+                                state.next = d_state.NEXT
+                                cur_next.next = 0
+                            else:
+                                state.next = d_state.STATIC
+                            adv(3)
+                        elif hm == 0:
+                            state.next = d_state.COPY
+                            skip = 8 - dio
+                            if skip <= 2:
+                                skip = 16 - dio
+                            length.next = get4(skip, 16)
+                            adv(skip + 16)
+                            cur_i.next = 0
+                            offset.next = 7
+                        else:
+                            state.next = d_state.IDLE
+                            print("Bad method")
+                            raise Error("Bad method")
+                        prev_method.next = hm
+                        print("set prev", hm)
+                    else:
                         static.next = True
-                        cur_static.next = 0
-                        print("prev method is", prev_method)
+                        method.next = 1
+                        cur_next.next = 0
+                        adv(3)
+                        prev_method.next = 1
                         if prev_method == 1:
                             print("skip HF init")
                             state.next = d_state.NEXT
-                            cur_next.next = 0
                         else:
                             state.next = d_state.STATIC
-                        adv(3)
-                    elif hm == 0:
-                        state.next = d_state.COPY
-                        skip = 8 - dio
-                        if skip <= 2:
-                            skip = 16 - dio
-                        length.next = get4(skip, 16)
-                        adv(skip + 16)
-                        cur_i.next = 0
-                        offset.next = 7
-                    else:
-                        state.next = d_state.IDLE
-                        print("Bad method")
-                        raise Error("Bad method")
-                    prev_method.next = hm
-                    print("set prev", hm)
 
             elif state == d_state.CSTATIC:
 
@@ -802,6 +843,9 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
 
                 if not COMPRESS:
                     pass
+                elif LOWLUT and fcount < 3:
+                    print("SEARCH", fcount)
+                    pass
                 else:
                     # print("cs",  cur_search, di, di - CWINDOW)
                     if cur_search >= 0 \
@@ -845,43 +889,45 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
 
             elif state == d_state.SEARCH10:
 
-                mdone = True
-                mlimit = 5
-                if MATCH10:
-                    mlimit = 10
-                # print("more/fcount", more, fcount)
-                if more <= mlimit:
-                    if fcount < more:
-                        raise Error("???")
-                    cbyte = b4
-                    if more == 5:
-                        cbyte = b5
-                    elif MATCH10:
-                        if more == 6:
-                            cbyte = b6
-                        elif more == 7:
-                            cbyte = b7
-                        elif more == 8:
-                            cbyte = b8
-                        elif more == 9:
-                            cbyte = b9
-                        elif more == 10:
-                            cbyte = b10
+                if LOWLUT and more != 6 and more > fcount:
+                    print("SEARCH10", more, fcount)
+                    pass
+                else:
+                    mdone = True
+                    mlimit = 5
+                    if MATCH10:
+                        mlimit = 10
+                    # print("more/fcount", more, fcount)
+                    if more <= mlimit:
+                        cbyte = b4
+                        if more == 5:
+                            cbyte = b5
+                        elif MATCH10:
+                            if more == 6:
+                                cbyte = b6
+                            elif more == 7:
+                                cbyte = b7
+                            elif more == 8:
+                                cbyte = b8
+                            elif more == 9:
+                                cbyte = b9
+                            elif more == 10:
+                                cbyte = b10
 
-                    if di < isize - more and iram[cur_search + more - 1 & IBS] == cbyte:
-                        more.next = more + 1
-                        mdone = False
+                        if di < isize - more and iram[cur_search + more - 1 & IBS] == cbyte:
+                            more.next = more + 1
+                            mdone = False
 
-                if mdone:
-                    match = more - 1
-                    distance = di - cur_search
-                    # print("d/l", distance, match)
-                    cur_dist.next = distance
-                    do_init.next = True
-                    # adv(match * 8)
-                    di.next = di + match
-                    mlength.next = match
-                    state.next = d_state.DISTANCE
+                    if mdone:
+                        match = more - 1
+                        distance = di - cur_search
+                        # print("d/l", distance, match)
+                        cur_dist.next = distance
+                        do_init.next = True
+                        # adv(match * 8)
+                        di.next = di + match
+                        mlength.next = match
+                        state.next = d_state.DISTANCE
 
             elif state == d_state.STATIC:
 
@@ -1340,13 +1386,16 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
 
                 if not DECOMPRESS:
                     pass
+                elif LOWLUT and fcount < 2:
+                    # print("INFLATE fc", fcount)
+                    pass
                 elif method == 1 and not filled:
                     # print("INFLATE !F")
                     filled.next = True
                 elif di >= isize - 4 and not i_mode == IDLE:
                     pass  # fetch more bytes
-                elif do >= i_raddr + OBSIZE: # - 10:
-                    # print("HOLDB")
+                elif do >= i_raddr + OBSIZE:
+                    print("HOLDB")
                     # filled.next = False
                     pass
                 elif di > isize - 3:  # checksum is 4 bytes
@@ -1412,7 +1461,7 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
 
                 if not DECOMPRESS:
                     pass
-                elif cur_i == 0 and do + length >= i_raddr + OBSIZE: # - 10:
+                elif cur_i == 0 and do + length >= i_raddr + OBSIZE:
                     # print("HOLDW", length, offset, cur_i, do, i_raddr)
                     pass
                 elif di >= isize - 2:
@@ -1438,21 +1487,27 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
                         o_done.next = True
                         state.next = d_state.IDLE
                 elif cur_i < length + 2:
-                    # print("L/O", length, offset)
+                    # print("L/O", length, offset, do)
                     oraddr.next = offset + cur_i
                     if cur_i == 1:
+                        off1.next = (offset == (do - 1) & OBS)
+                        off2.next = (offset == (do - 2) & OBS)
                         copy1.next = orbyte
                         # print("c1", cur_i, length, offset, do, orbyte)
                     if cur_i == 3:
                         copy2.next = orbyte
                     if cur_i > 1:
                         # Special 1 byte offset handling:
-                        if (offset + cur_i) & OBS == (do + 1) & OBS:
+                        # if (offset + cur_i) & OBS == (do + 1) & OBS:
+                        if off1:
+                            # print("1 byte", do)
                             obyte.next = copy1
-                        elif cur_i == 3 or (offset + cur_i) & OBS != do & OBS:
+                        # elif cur_i == 3 or (offset + cur_i) & OBS != do & OBS:
+                        elif cur_i == 3 or not off2:
                             obyte.next = orbyte
                         # Special 2 byte offset handling:
                         elif cur_i > 2:
+                            # print("2 byte", do)
                             if cur_i & 1:
                                 obyte.next = copy2
                             else:

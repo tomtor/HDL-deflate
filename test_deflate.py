@@ -12,7 +12,7 @@ from deflate import IDLE, WRITE, READ, STARTC, STARTD, LBSIZE, IBSIZE, \
                     CWINDOW, COMPRESS, DECOMPRESS, OBSIZE, LMAX, LIBSIZE, \
                     DYNAMIC, LOBSIZE, LOWLUT
 
-MAXW = CWINDOW - 1
+MAXW = CWINDOW
 
 COSIMULATION = True
 COSIMULATION = False
@@ -277,10 +277,10 @@ class TestDeflate(unittest.TestCase):
                 print("IN/OUT/CYCLES/WAIT", slen, len(sresult),
                     (now() - start) // 10, wait)
                 sresult = b''.join(sresult)
-                print("len sresult", len(sresult))
+                # print("len sresult", len(sresult))
                 rlen = min(len(b_data), slen)
-                print("rlen", rlen)
-                print(sresult)
+                # print("rlen", rlen)
+                # print(sresult)
                 self.assertEqual(zlib.decompress(sresult)[:rlen], b_data[:rlen])
                 print("zlib test:", zlib.decompress(sresult)[:130])
 

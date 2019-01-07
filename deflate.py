@@ -18,12 +18,12 @@ from myhdl import always, block, Signal, intbv, Error, ResetSignal, \
 IDLE, RESET, WRITE, READ, STARTC, STARTD = range(6)
 
 # Trade speed and functionality (DYNAMIC trees) for LUTs
-LOWLUT=True
 LOWLUT=False
+LOWLUT=True
 
 # set options manually
-COMPRESS = False
 COMPRESS = True
+COMPRESS = False
 
 DECOMPRESS = False
 DECOMPRESS = True
@@ -617,7 +617,7 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
                                 skip = 16 - dio
                             length.next = get4(skip, 16)
                             adv(skip + 16)
-                            copy_i.next = 0
+                            cur_i.next = 0
                             offset.next = 7
                         else:
                             state.next = d_state.IDLE
@@ -939,7 +939,7 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
                     if mdone:
                         match = more - 1
                         distance = di - cur_search
-                        print("d/l", distance, match)
+                        # print("d/l", distance, match)
                         cur_dist.next = distance
                         do_init.next = True
                         # adv(match * 8)
@@ -1399,7 +1399,7 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
                     offset.next = (do - distance) & OBS
                     length.next = tlength
                     # cur_next.next = 0
-                    copy_i.next = 0
+                    cur_i.next = 0
                     oraddr.next = do - distance
                     state.next = d_state.COPY
 
@@ -1469,7 +1469,7 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
                             # print("adv", extraLength + 5 + moreBits)
                             offset.next = (do - distance) & OBS
                             length.next = tlength
-                            copy_i.next = 0
+                            cur_i.next = 0
                             oraddr.next = do - distance
                             state.next = d_state.COPY
                         else:
@@ -1483,8 +1483,8 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
 
                 if not DECOMPRESS:
                     pass
-                elif copy_i == 0 and do + length >= i_raddr + OBSIZE:
-                    # print("HOLDW", length, offset, copy_i, do, i_raddr)
+                elif cur_i == 0 and do + length >= i_raddr + OBSIZE:
+                    # print("HOLDW", length, offset, cur_i, do, i_raddr)
                     pass
                 elif di >= isize - 2:
                     # print("HOLD2")
@@ -1493,12 +1493,12 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
                     if not filled:
                         # print("COPY !F")
                         filled.next = True
-                    elif copy_i < length:
+                    elif cur_i < length:
                         oaddr.next = do
                         obyte.next = b3
                         # adv(8)
                         di.next = di + 1
-                        copy_i.next = copy_i + 1
+                        cur_i.next = cur_i + 1
                         do.next = do + 1
                         o_oprogress.next = do + 1
                     elif not ONEBLOCK and not final:
@@ -1510,38 +1510,38 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
                     else:
                         o_done.next = True
                         state.next = d_state.IDLE
-                elif copy_i < length + 2:
+                elif cur_i < length + 2:
                     # print("L/O", length, offset, do)
-                    oraddr.next = offset + copy_i
-                    if copy_i == 1:
+                    oraddr.next = offset + cur_i
+                    if cur_i == 1:
                         off1.next = (offset == (do - 1) & OBS)
                         off2.next = (offset == (do - 2) & OBS)
                         copy1.next = orbyte
-                        # print("c1", copy_i, length, offset, do, orbyte)
-                    if copy_i == 3:
+                        # print("c1", cur_i, length, offset, do, orbyte)
+                    if cur_i == 3:
                         copy2.next = orbyte
-                    if copy_i > 1:
+                    if cur_i > 1:
                         # Special 1 byte offset handling:
-                        # if (offset + copy_i) & OBS == (do + 1) & OBS:
+                        # if (offset + cur_i) & OBS == (do + 1) & OBS:
                         if off1:
                             # print("1 byte", do)
                             obyte.next = copy1
-                        # elif copy_i == 3 or (offset + copy_i) & OBS != do & OBS:
-                        elif copy_i == 3 or not off2:
+                        # elif cur_i == 3 or (offset + cur_i) & OBS != do & OBS:
+                        elif cur_i == 3 or not off2:
                             obyte.next = orbyte
                         # Special 2 byte offset handling:
-                        elif copy_i > 2:
+                        elif cur_i > 2:
                             # print("2 byte", do)
-                            if copy_i & 1:
+                            if cur_i & 1:
                                 obyte.next = copy2
                             else:
                                 obyte.next = copy1
-                        else:  # copy_i == 2
+                        else:  # cur_i == 2
                             obyte.next = copy1
                         oaddr.next = do
                         o_oprogress.next = do + 1
                         do.next = do + 1
-                    copy_i.next = copy_i + 1
+                    cur_i.next = cur_i + 1
                 else:
                     cur_next.next = 0
                     state.next = d_state.NEXT

@@ -18,9 +18,20 @@ icarus: test_fast_bench.v
 
 yosys:
 	mv test40.log test40.old.log
-	sed -e '/disable MY/d' -e '/\$finish/d' < test_deflate_bench.v > test40.v
+	sed -e '/disable MYHDL/d' -e '/\$$finish/d' < test_deflate_bench.v > test40.v
 	yosys -p "synth_ice40 -blif test40.blif" test40.v 2>&1 > test40.log
 	tail -20 test40.log
+
+pico:
+	yosys -p "synth_ice40 -blif test40.blif" picorv32.v 2>&1 > test40.log
+	tail -20 test40.log
+
+place:
+	#arachne-pnr -d 5k -P sg48 -p upduino_v2.pcf chip.blif -o chip.txt
+	arachne-pnr -d 5k -P sg48 test40.blif -o test40.txt
+
+time:
+	icetime -tmd up5k test40.asc
 
 clean:
 	rm -f *.vcd

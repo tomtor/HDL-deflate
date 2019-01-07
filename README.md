@@ -138,29 +138,26 @@ BRAM	|1.5
 
 ## Lattice UltraPLus
 
-# Decompress LOWLUT
+### Decompress LOWLUT
 
-Resource|Estimation
---------|----------
-   Number of cells|               4937
-     SB_CARRY     |                640
-     SB_DFF       |                 50
-     SB_DFFE      |                915
-     SB_DFFESR    |                220
-     SB_DFFESS    |                  4
-     SB_LUT4      |               3104
+    Number of cells:               3788
+      SB_CARRY                      448
+      SB_DFF                         41
+      SB_DFFE                       813
+      SB_DFFESR                      25
+      SB_DFFESS                       1
+      SB_LUT4                      2458
+      SB_RAM40_4K                     2
 
-# Compress LOWLUT
+### Compress LOWLUT
 
-Resource|Estimation
---------|----------
-   Number of cells|               6796
-     SB_CARRY     |                917
-     SB_DFF       |                 43
-     SB_DFFE      |                794
-     SB_DFFESR    |                 49
-     SB_DFFESS    |                  6
-     SB_LUT4      |               4986
+    Number of cells                6796
+      SB_CARRY                      917
+      SB_DFF                         43
+      SB_DFFE                       794
+      SB_DFFESR                      49
+      SB_DFFESS                       6
+      SB_LUT4                      4986
 
 ## Speed
 

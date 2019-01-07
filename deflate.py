@@ -902,6 +902,7 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
                         # print("B1", b1)
                         # adv(8)
                         di.next = di + 1
+                        # o_iprogress.next = di
                         outlen = codeLength[bdata]
                         outbits = out_codes[bdata] # code_bits[bdata]
                         # print("CBITS:", bdata, outlen, outbits)
@@ -944,6 +945,7 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
                         do_init.next = True
                         # adv(match * 8)
                         di.next = di + match
+                        # o_iprogress.next = di
                         mlength.next = match
                         state.next = d_state.DISTANCE
 
@@ -1498,12 +1500,14 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
                         obyte.next = b3
                         # adv(8)
                         di.next = di + 1
+                        o_iprogress.next = di
                         cur_i.next = cur_i + 1
                         do.next = do + 1
                         o_oprogress.next = do + 1
                     elif not ONEBLOCK and not final:
                         # adv(16)
                         di.next = di + 2
+                        o_iprogress.next = di
                         state.next = d_state.HEADER
                         filled.next = False
                         print("new block")

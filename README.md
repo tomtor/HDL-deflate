@@ -80,7 +80,9 @@ with a soft CPU).
 
 # FPGA validation
 
-## Default (Decompress with IBUF = 16 * CWINDOW and Compress with FAST/MATCH10)
+## Xilinx
+
+### Default (Decompress with IBUF = 16 * CWINDOW and Compress with FAST/MATCH10)
 
 Resource|Estimation
 --------|----------
@@ -89,7 +91,7 @@ LUTRAM	|1248
 FF	|3018
 BRAM	|33
 
-## Decompress False and FAST and MATCH10
+### Decompress False and FAST and MATCH10
 
 Resource|Estimation
 --------|----------
@@ -98,7 +100,7 @@ LUTRAM	|156
 FF	|760
 BRAM	|8.5
 
-## Decompress False and FAST
+### Decompress False and FAST
 
 Resource|Estimation
 --------|----------
@@ -107,16 +109,16 @@ LUTRAM	|84
 FF	|695
 BRAM	|8.5
 
-## Decompress False and MATCH10
+### Decompress False and MATCH10/LOWLUT
 
 Resource|Estimation
 --------|----------
-LUT	|1485
-LUTRAM	|120
-FF	|517
-BRAM	|8.5
+LUT	|1191
+LUTRAM	|84
+FF	|385
+BRAM	|1
 
-## Compress False
+### Compress False
 
 Resource|Estimation
 --------|----------
@@ -125,7 +127,7 @@ LUTRAM	|48
 FF	|2491
 BRAM	|32.5
 
-## Compress False and LOWLUT
+### Compress False and LOWLUT
 
 Resource|Estimation
 --------|----------
@@ -133,6 +135,32 @@ LUT	|2157
 LUTRAM	|36
 FF	|858
 BRAM	|1.5
+
+## Lattice UltraPLus
+
+# Decompress LOWLUT
+
+Resource|Estimation
+--------|----------
+   Number of cells|               4937
+     SB_CARRY     |                640
+     SB_DFF       |                 50
+     SB_DFFE      |                915
+     SB_DFFESR    |                220
+     SB_DFFESS    |                  4
+     SB_LUT4      |               3104
+
+# Compress LOWLUT
+
+Resource|Estimation
+--------|----------
+   Number of cells|               6796
+     SB_CARRY     |                917
+     SB_DFF       |                 43
+     SB_DFFE      |                794
+     SB_DFFESR    |                 49
+     SB_DFFESS    |                  6
+     SB_LUT4      |               4986
 
 ## Speed
 

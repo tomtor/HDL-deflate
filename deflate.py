@@ -25,8 +25,8 @@ LOWLUT=True
 COMPRESS = False
 COMPRESS = True
 
-DECOMPRESS = True
 DECOMPRESS = False
+DECOMPRESS = True
 
 DYNAMIC = False
 DYNAMIC = True
@@ -71,6 +71,7 @@ if LOWLUT:
 else:
     LMAX = 24
 
+# =============== End of user settable parameters ==================
 
 if OBSIZE > IBSIZE:
     LBSIZE = int(log2(OBSIZE))
@@ -169,6 +170,7 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
     method = Signal(intbv()[3:])
     prev_method = Signal(intbv(3)[2:])
     final = Signal(bool())
+
     do_compress = Signal(bool())
 
     numLiterals = Signal(intbv()[9:])
@@ -247,7 +249,7 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
     spread_i = Signal(intbv()[9:])
     cur_HF1 = Signal(intbv()[MaxCodeLength+1:])
     cur_static = Signal(intbv()[9:])
-    cur_cstatic = Signal(intbv()[LMAX:])
+    cur_cstatic = Signal(intbv()[4:])
     cur_search = Signal(intbv(min=-1,max=1<<LMAX))
     more = Signal(intbv()[4:])
     cur_dist = Signal(intbv(min=-CWINDOW,max=IBSIZE))
@@ -357,7 +359,7 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
                 if do_compress:
                     print("FILL", di, old_di, nb, b1, b2, b3, b4)
                 """
-                if FAST:  # and do_compress:
+                if FAST:
                     shift = (di - old_di) * 8
                     """
                     if shift != 0:
@@ -646,11 +648,10 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
 
                 # print("CSTATIC", cur_i, ob1, do, doo, isize)
 
-                no_adv = 0
                 if not COMPRESS:
                     pass
                 elif not nb:
-                    no_adv = 1
+                    pass
                 elif cur_cstatic == 0:
                     flush.next = False
                     ob1.next = 0
@@ -659,60 +660,69 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
                     ladler1.next = 0
                     oaddr.next = 0
                     obyte.next = 0x78
+                    cur_cstatic.next = 1
                 elif cur_cstatic == 1:
                     oaddr.next = 1
                     obyte.next = 0x9c
                     do.next = 2
+                    cur_cstatic.next = 2
                 elif cur_cstatic == 2:
                     put(0x3, 3)
+                    cur_cstatic.next = 3
                 elif flush:
                     # print("flush", do, ob1)
-                    no_adv = 1
                     oaddr.next = do
                     obyte.next = ob1
                     do_flush()
-                elif cur_cstatic >= isize - 10 and i_mode != IDLE:
-                    print("P", cur_cstatic, isize)
-                    no_adv = 1
-                elif cur_cstatic > isize + 3:
-                    if cur_cstatic == isize + 4:
+                elif di >= isize - 10 and i_mode != IDLE:
+                    print("P", di, isize)
+                    pass
+                elif di > isize + 3:
+                    if cur_cstatic == 3:
+                        cur_cstatic.next = 4
                         print("Put EOF", do)
                         cs_i = EndOfBlock
                         outlen = codeLength[cs_i]
                         outbits = out_codes[cs_i] # code_bits[cs_i]
                         print("EOF BITS:", cs_i, outlen, outbits)
                         put(outbits, outlen)
-                    elif cur_cstatic == isize + 5:
+                    elif cur_cstatic == 4:
+                        cur_cstatic.next = 5
                         print("calc end adler")
                         adler2.next = (adler2 + ladler1) % 65521
                         if doo != 0:
                             oaddr.next = do
                             obyte.next = ob1
                             do.next = do + 1
-                    elif cur_cstatic == isize + 6:
+                    elif cur_cstatic == 5:
+                        cur_cstatic.next = 6
                         print("c1", adler2)
                         oaddr.next = do
                         obyte.next = adler2 >> 8
                         do.next = do + 1
                         o_oprogress.next = do + 1
-                    elif cur_cstatic == isize + 7:
+                    elif cur_cstatic == 6:
+                        cur_cstatic.next = 7
                         print("c2")
                         oaddr.next = do
                         obyte.next = adler2 & 0xFF
                         do.next = do + 1
                         o_oprogress.next = do + 1
-                    elif cur_cstatic == isize + 8:
+                    elif cur_cstatic == 7:
+                        cur_cstatic.next = 8
                         print("c3", adler1)
                         oaddr.next = do
                         obyte.next = adler1 >> 8
                         do.next = do + 1
                         o_oprogress.next = do + 1
-                    elif cur_cstatic == isize + 9:
+                    elif cur_cstatic == 8:
+                        cur_cstatic.next = 9
                         print("c4")
                         oaddr.next = do
                         obyte.next = adler1 & 0xFF
                         o_oprogress.next = do + 1
-                    elif cur_cstatic == isize + 10:
+                    elif cur_cstatic == 9:
+                        cur_cstatic.next = 10
                         print("EOF finish", do)
                         o_done.next = True
                         state.next = d_state.IDLE
@@ -730,9 +740,6 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
                     state.next = d_state.SEARCH
                     cur_search.next = di - 1  # & IBS
 
-                if not no_adv:
-                    cur_cstatic.next = cur_cstatic + 1
-
             elif state == d_state.DISTANCE:
 
                 if not COMPRESS:
@@ -741,7 +748,6 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
                     do_flush()
                 elif do_init:
                     do_init.next = False
-                    cur_cstatic.next = cur_cstatic + mlength - 1
                     outcarrybits.next = 0
                     lencode = mlength + 254
                     # print("fast:", distance, di, isize, match)
@@ -962,7 +968,7 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
                 for stat_i in range(280, 288):
                     codeLength[stat_i].next = 8
                 numCodeLength.next = 288
-                if do_compress:
+                if COMPRESS and do_compress:
                     state.next = d_state.CSTATIC
                 elif DYNAMIC:
                     cur_HF1.next = 0
@@ -1253,10 +1259,7 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
                         # print("SKIP UNUSED")
                         spread_i.next = spread_i + 1
                 else:
-                    if do_compress:
-                        state.next = d_state.CSTATIC
-                        cur_cstatic.next = 0
-                    elif method == 3 and DYNAMIC:
+                    if method == 3 and DYNAMIC:
                         state.next = d_state.DISTTREE
                     elif method == 4 and DYNAMIC:
                         print("DEFLATE m2!")

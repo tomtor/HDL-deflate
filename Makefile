@@ -24,11 +24,15 @@ yosys:
 
 pico:
 	yosys -p "synth_ice40 -blif test40.blif" picorv32.v 2>&1 > test40.log
-	tail -20 test40.log
+	tail -25 test40.log
 
 place:
 	#arachne-pnr -d 5k -P sg48 -p upduino_v2.pcf chip.blif -o chip.txt
 	arachne-pnr -d 5k -P sg48 test40.blif -o test40.txt
+
+next:
+	yosys -p "synth_ice40 -json test40.json" test40.v
+	nextpnr-ice40 --up5k --json test40.json --asc test40.asc
 
 time:
 	icetime -tmd up5k test40.asc

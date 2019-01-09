@@ -131,9 +131,9 @@ BRAM	|32.5
 
 Resource|Estimation
 --------|----------
-LUT	|381
-LUTRAM	|16
-FF	|270
+LUT	|712
+LUTRAM	|24
+FF	|330
 BRAM	|1
 
 ## Lattice UltraPLus

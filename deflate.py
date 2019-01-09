@@ -13,7 +13,7 @@ of a decoder from https://create.stephan-brumme.com/deflate-decoder
 from math import log2
 
 from myhdl import always, block, Signal, intbv, Error, ResetSignal, \
-    enum, always_seq, always_comb, concat, ConcatSignal, modbv
+    enum, always_comb, concat, ConcatSignal, modbv
 
 IDLE, RESET, WRITE, READ, STARTC, STARTD = range(6)
 
@@ -22,8 +22,8 @@ LOWLUT = True
 LOWLUT = False
 
 # set options manually
-COMPRESS = True
 COMPRESS = False
+COMPRESS = True
 
 DECOMPRESS = False
 DECOMPRESS = True
@@ -61,7 +61,7 @@ OBSIZE = 512    # Minimal size of output buffer (BRAM)
 
 # Size of input buffer (LUT-RAM)
 if FAST:
-    IBSIZE = 16 * CWINDOW  # This size gives method 2 (dynamic tree) for testbench
+    IBSIZE = 16 * CWINDOW  # This size gives dynamic tree for testbench
 else:
     IBSIZE = 2 * CWINDOW   # Minimal window
 
@@ -86,9 +86,9 @@ OBS = (1 << LOBSIZE) - 1
 
 d_state = enum('IDLE', 'HEADER', 'BL', 'READBL', 'REPEAT', 'DISTTREE', 'INIT3',
                'HF1', 'HF1INIT', 'HF2', 'HF3', 'HF4', 'HF4_2', 'HF4_3',
-               'STATIC', 'D_NEXT', 'D_NEXT_2',
-               'D_INFLATE', 'SPREAD', 'NEXT', 'INFLATE', 'COPY', 'CSTATIC',
-               'SEARCH', 'SEARCH10', 'SEARCHF', 'DISTANCE', 'CHECKSUM') # , encoding='one_hot')
+               'STATIC', 'D_NEXT', 'D_NEXT_2', 'D_INFLATE', 'SPREAD', 'NEXT',
+               'INFLATE', 'COPY', 'CSTATIC', 'SEARCH', 'SEARCH10', 'SEARCHF',
+               'DISTANCE', 'CHECKSUM')  # , encoding='one_hot')
 
 CodeLengthOrder = (16, 17, 18, 0, 8, 7, 9, 6, 10, 5, 11, 4, 12, 3, 13, 2, 14,
                    1, 15)
@@ -246,7 +246,6 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
     b_numCodeLength = Signal(intbv()[9:])
 
     CodeLengths = 19
-    copy_i = Signal(intbv()[LOBSIZE:])
     if DYNAMIC:
         MaxCodeLength = 15
         InstantMaxBit = 10
@@ -266,13 +265,14 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
     bitLengthCount = [Signal(intbv()[9:]) for _ in range(MaxCodeLength+1)]
     nextCode = [Signal(intbv()[CODEBITS+1:]) for _ in range(MaxCodeLength+1)]
     reverse = Signal(modbv()[CODEBITS:])
-    # code_bits = [Signal(intbv()[MaxCodeLength:]) for _ in range(MaxBitLength)]
     distanceLength = [Signal(intbv()[4:]) for _ in range(32)]
 
     if DECOMPRESS:
         if DYNAMIC:
-            leaves = [Signal(intbv()[CODEBITS + BITBITS:]) for _ in range(32768)]
-            d_leaves = [Signal(intbv()[CODEBITS + BITBITS:]) for _ in range(4096)]
+            leaves = [Signal(intbv()[CODEBITS + BITBITS:])
+                      for _ in range(32768)]
+            d_leaves = [Signal(intbv()[CODEBITS + BITBITS:])
+                        for _ in range(4096)]
         else:
             leaves = [Signal(bool())]
             d_leaves = [Signal(bool())]
@@ -314,9 +314,9 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
     cur_HF1 = Signal(intbv()[MaxCodeLength+1:])
     cur_static = Signal(intbv()[9:])
     cur_cstatic = Signal(intbv()[4:])
-    cur_search = Signal(intbv(min=-1,max=1<<LMAX))
+    cur_search = Signal(intbv(min=-1, max=1 << LMAX))
     more = Signal(intbv()[4:])
-    cur_dist = Signal(intbv(min=-CWINDOW,max=IBSIZE))
+    cur_dist = Signal(intbv(min=-CWINDOW, max=IBSIZE))
     cur_next = Signal(intbv()[5:])
 
     do_init = Signal(bool())
@@ -399,7 +399,8 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
     def matcher3(o_m, mi):
         @always_comb
         def logic():
-            o_m.next = ((concat(cwindow,b1,b2) >> (8 * mi)) & 0xFFFFFF) == (b14 >> 8)
+            o_m.next = (((concat(cwindow, b1, b2) >> (8 * mi)) & 0xFFFFFF)
+                        == (b14 >> 8))
         return logic
 
     if FAST:
@@ -436,9 +437,11 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
                         print("shift", shift, cwindow, b1, b2, b3, b4)
                     """
                     if MATCH10:
-                        cwindow.next = (cwindow << shift) | (b110 >> (80 - shift))
+                        cwindow.next = ((cwindow << shift)
+                                        | (b110 >> (80 - shift)))
                     else:
-                        cwindow.next = (cwindow << shift) | (b15 >> (40 - shift))
+                        cwindow.next = ((cwindow << shift)
+                                        | (b15 >> (40 - shift)))
 
                 # print("old di fcount", old_di, di, fcount)
                 b1.next = iram[di & IBS]
@@ -753,7 +756,7 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
                         print("Put EOF", do)
                         cs_i = EndOfBlock
                         outlen = codeLength[cs_i]
-                        outbits = out_codes[cs_i] # code_bits[cs_i]
+                        outbits = out_codes[cs_i]
                         print("EOF BITS:", cs_i, outlen, outbits)
                         put(outbits, outlen)
                     elif cur_cstatic == 4:
@@ -803,7 +806,7 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
                     bdata = b1
                     if FAST:
                         bdata = iram[di & IBS]
-                    o_iprogress.next = di # & IBS
+                    o_iprogress.next = di
                     adler1_next = (adler1 + bdata) % 65521
                     adler1.next = adler1_next
                     adler2.next = (adler2 + ladler1) % 65521
@@ -824,7 +827,7 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
                     lencode = mlength + 254
                     # print("fast:", distance, di, isize, match)
                     outlen = codeLength[lencode]
-                    outbits = out_codes[lencode] # code_bits[lencode]
+                    outbits = out_codes[lencode]
                     # print("BITS:", outlen, outbits)
                     put(outbits, outlen)
                     cur_i.next = 0
@@ -850,11 +853,9 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
                         if extra_bits <= 4:
                             # print("outcode", outcode)
                             put(outcode, 5 + extra_bits)
-                            #state.next = d_state.CSTATIC
                             state.next = d_state.CHECKSUM
                         else:
                             # print("LONG", extra_bits, outcode)
-                            # outcarry.next = outcode & ((1 << (extra_bits - 4)) - 1)
                             outcarry.next = outcode >> 8
                             outcarrybits.next = extra_bits - 3
                             outcode = outcode & 0xFF
@@ -898,36 +899,36 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
                                 iram[fmatch2+1 & IBS] == b5:
                             match = 5
                             if MATCH10:
-                              if fcount < 6:
-                                  mdone = False
-                                  # print("fcount", fcount)
-                              elif di < isize - 6 and \
-                                    iram[fmatch2+2 & IBS] == b6:
-                                match = 6
-                                if fcount < 7:
+                                if fcount < 6:
                                     mdone = False
                                     # print("fcount", fcount)
-                                elif di < isize - 7 and \
-                                        iram[fmatch2+3 & IBS] == b7:
-                                    match = 7
-                                    if fcount < 8:
+                                elif di < isize - 6 and \
+                                        iram[fmatch2+2 & IBS] == b6:
+                                    match = 6
+                                    if fcount < 7:
                                         mdone = False
                                         # print("fcount", fcount)
-                                    elif di < isize - 8 and \
-                                            iram[fmatch2+4 & IBS] == b8:
-                                        match = 8
-                                        if fcount < 9:
+                                    elif di < isize - 7 and \
+                                            iram[fmatch2+3 & IBS] == b7:
+                                        match = 7
+                                        if fcount < 8:
                                             mdone = False
                                             # print("fcount", fcount)
-                                        elif di < isize - 9 and \
-                                                iram[fmatch2+5 & IBS] == b9:
-                                            match = 9
-                                            if fcount < 10:
+                                        elif di < isize - 8 and \
+                                                iram[fmatch2+4 & IBS] == b8:
+                                            match = 8
+                                            if fcount < 9:
                                                 mdone = False
                                                 # print("fcount", fcount)
-                                            elif di < isize - 10 and \
-                                                    iram[fmatch2+6 & IBS] == b10:
-                                                match = 10
+                                            elif di < isize - 9 and \
+                                                    iram[fmatch2+5 & IBS] == b9:
+                                                match = 9
+                                                if fcount < 10:
+                                                    mdone = False
+                                                    # print("fcount", fcount)
+                                                elif di < isize - 10 and \
+                                                        iram[fmatch2+6 & IBS] == b10:
+                                                    match = 10
 
                     if mdone:
                         # distance = di - cur_search
@@ -988,7 +989,7 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
                         if not FAST:
                             filled.next = False
                         outlen = codeLength[bdata]
-                        outbits = out_codes[bdata] # code_bits[bdata]
+                        outbits = out_codes[bdata]
                         # print("CBITS:", bdata, outlen, outbits)
                         put(outbits, outlen)
                         state.next = d_state.CSTATIC
@@ -1020,7 +1021,8 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
                             elif more == 10:
                                 cbyte = b10
 
-                        if di < isize - more and iram[cur_search + more - 1 & IBS] == cbyte:
+                        if di < isize - more and \
+                                iram[cur_search + more - 1 & IBS] == cbyte:
                             more.next = more + 1
                             mdone = False
 
@@ -1140,11 +1142,10 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
 
                 if not DECOMPRESS or not DYNAMIC:
                     pass
-                elif cur_i < len(codeLength): # MaxBitLength:
+                elif cur_i < len(codeLength):
                     codeLength[cur_i].next = 0
                     cur_i.next = cur_i + 1
                 else:
-                    # numCodeLength.next = MaxBitLength
                     method.next = 3  # Start building bit tree
                     cur_HF1.next = 0
                     state.next = d_state.HF1
@@ -1360,11 +1361,9 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
                         # print(spread, spread_i)
                         dlwaddr.next = spread
                         dwleaf.next = makeLeaf(spread_i, codeLength[spread_i])
-                        # d_leaves[spread].next = makeLeaf(spread_i, codeLength[spread_i])
                     else:
                         lwaddr.next = spread
                         wleaf.next = makeLeaf(spread_i, codeLength[spread_i])
-                        # leaves[spread].next = makeLeaf(spread_i, codeLength[spread_i])
                     # print("SPREAD:", spread, step, instantMask)
                     aim = instantMask
                     if method == 4 and DYNAMIC:
@@ -1500,7 +1499,6 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
                     # print("INFLATE fc", fcount)
                     pass
                 elif method == 1 and not filled:
-                # elif not filled:
                     # print("INFLATE !F")
                     filled.next = True
                 elif di >= isize - 4 and not i_mode == IDLE:
@@ -1550,8 +1548,7 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
                             # print("dcode", distanceCode)
                             distance = CopyDistance[distanceCode]
                             # print("distance", distance)
-                            moreBits = ExtraDistanceBits[distanceCode
-                                                            >> 1]
+                            moreBits = ExtraDistanceBits[distanceCode >> 1]
                             distance += get4(extraLength + 5, moreBits)
                             # print("distance2", distance)
                             adv(extraLength + 5 + moreBits)
@@ -1653,4 +1650,4 @@ if __name__ == "__main__":
                 Signal(intbv()[8:]),
                 Signal(modbv()[LIBSIZE:]), Signal(modbv()[LBSIZE:]),
                 Signal(bool(0)), ResetSignal(1, 0, True))
-    d.convert()
+    d.convert(initial_values=False)

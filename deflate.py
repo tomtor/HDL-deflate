@@ -18,12 +18,12 @@ from myhdl import always, block, Signal, intbv, Error, ResetSignal, \
 IDLE, RESET, WRITE, READ, STARTC, STARTD = range(6)
 
 # Trade speed and functionality (DYNAMIC trees) for LUTs
-LOWLUT = False
 LOWLUT = True
+LOWLUT = False
 
 # set options manually
-COMPRESS = True
 COMPRESS = False
+COMPRESS = True
 
 DECOMPRESS = False
 DECOMPRESS = True

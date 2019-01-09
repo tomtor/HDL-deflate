@@ -139,7 +139,7 @@ BRAM	|1
 
 ### Decompress only with LOWLUT
 
-   Number of cells:               3312
+    Number of cells:               3312
      SB_CARRY                      511
      SB_DFF                         41
      SB_DFFE                       302
@@ -151,12 +151,12 @@ BRAM	|1
 ### Compress
 
     Number of cells                6796
-      SB_CARRY                      917
-      SB_DFF                         43
-      SB_DFFE                       794
-      SB_DFFESR                      49
-      SB_DFFESS                       6
-      SB_LUT4                      4986
+     SB_CARRY                      917
+     SB_DFF                         43
+     SB_DFFE                       794
+     SB_DFFESR                      49
+     SB_DFFESS                       6
+     SB_LUT4                      4986
 
 ## Speed
 

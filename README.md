@@ -166,7 +166,7 @@ Non FAST passes timing constraints for 100 Mhz.
 
 # Future Improvements (when there is interest)
 
-* ~~Reduce LUT usage: Try to fit in a Lattice ultra plus 5k~~
+* Reduce LUT usage: Try to fit in a Lattice ultra plus 5k. Because these devices have no LUT-ram the input buffer must be rewritten to use BRAM. This will reduce the LUT usage.
 * ~~Improve speed from current 80Mhz to 100Mhz~~
 * ~~Improve compression performance~~
 * Handle compress input streams < 4 bytes

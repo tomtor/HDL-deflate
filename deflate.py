@@ -22,8 +22,8 @@ LOWLUT = False
 LOWLUT = True
 
 # set options manually
-COMPRESS = False
 COMPRESS = True
+COMPRESS = False
 
 DECOMPRESS = False
 DECOMPRESS = True
@@ -41,6 +41,8 @@ ONEBLOCK = True
 ONEBLOCK = False
 
 if LOWLUT:
+    if COMPRESS:
+        raise Error("compress cannot be combined with LOWLUT")
     DYNAMIC = False
     # MATCH10 = False
     FAST = False
@@ -360,7 +362,8 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
     else:
         b110 = Signal(bool())
 
-    fcount = Signal(intbv(min=-1, max=10))
+    fcount = Signal(intbv(min=0, max=15))
+    rcount = Signal(intbv(min=0, max=15))
 
     nb = Signal(bool())
 
@@ -395,7 +398,7 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
         @always(clk.posedge)
         def bramread():
             orbyte.next = oram[oraddr]
-            irbyte.next = iram[di + fcount & IBS]
+            irbyte.next = iram[di + rcount & IBS]
             drleaf.next = d_leaves[dlraddr]
 
     @block
@@ -422,12 +425,10 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
         else:
             if isize < 4:
                 nb.next = 0
-                fcount.next = 0
                 if FAST:
                     old_di.next = 0
             elif i_mode == STARTC or i_mode == STARTD:
                 nb.next = 0
-                fcount.next = 0
                 if FAST:
                     old_di.next = 0
             else:
@@ -471,18 +472,19 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
 
                     rb = irbyte # iram[di + fcount & IBS]
                     if LOWLUT:
-                        if fcount == 1:
+                        fcount.next = rcount
+                        if rcount == 1:
                             b1.next = rb
-                        elif fcount == 2:
+                        elif rcount == 2:
                             b2.next = rb
-                        elif fcount == 3:
+                        elif rcount == 3:
                             b3.next = rb
-                        elif fcount == 4:
+                        elif rcount == 4:
                             b4.next = rb
-                        elif fcount == 5:
+                        elif rcount == 5:
                             b5.next = rb
-                        if fcount < 5:
-                            fcount.next = fcount + 1
+                        if rcount < 5:
+                            rcount.next = rcount + 1
                     elif fcount == 4:
                         b5.next = rb
                         fcount.next = 5
@@ -502,7 +504,8 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
                 else:
                     # print("fcount set", fcount)
                     if LOWLUT:
-                        fcount.next = -1
+                        rcount.next = 0
+                        fcount.next = 0
                     else:
                         fcount.next = 4
                         b4.next = iram[di+3 & IBS]
@@ -1506,7 +1509,7 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
 
                 if not DECOMPRESS:
                     pass
-                elif LOWLUT and fcount < 4:
+                elif LOWLUT and fcount < 3:
                     # print("INFLATE fc", fcount)
                     pass
                 elif method == 1 and not filled:

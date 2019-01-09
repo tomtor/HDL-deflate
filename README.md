@@ -73,10 +73,9 @@ In general HDL-Deflate is interesting when speed is important. When speed is not
 CPU with zlib and dynamic RAM is probably the better approach. Especially decompression is also reasonable
 fast with a CPU and HDL-Deflate needs a lot of BRAM when configured to decompress ANY deflate input stream.
 
-Compression is another story because it is a LOT faster in hardware with the `FAST` option and uses a reasonable amount of LUTs.
+Compression is another story because it is a LOT faster in hardware with the `FAST` option and uses a reasonable amount of LUTs on Xilinx. Lattice compress resource usage is bigger because it has no LUT-ram.
 
-Decompression only mode with the LOWLUT option can be interesting because it also has a reasonable size (comparable
-with a soft CPU on Lattice and much smaller on Xilinx).
+Decompression only mode with the LOWLUT option can be interesting because it also has a reasonable size. Its size is comparable with a soft CPU on Lattice (but it is a lot faster) and it is much smaller on Xilinx.
 
 # FPGA validation
 
@@ -91,7 +90,7 @@ LUTRAM	|1248
 FF	|3018
 BRAM	|33
 
-### Decompress False and FAST and MATCH10
+### Compress only and FAST and MATCH10
 
 Resource|Estimation
 --------|----------
@@ -100,7 +99,7 @@ LUTRAM	|156
 FF	|760
 BRAM	|8.5
 
-### Decompress False and FAST
+### Compress only and FAST
 
 Resource|Estimation
 --------|----------
@@ -109,7 +108,7 @@ LUTRAM	|84
 FF	|695
 BRAM	|8.5
 
-### Decompress False and MATCH10/LOWLUT
+### Compress only and MATCH10
 
 Resource|Estimation
 --------|----------
@@ -118,7 +117,7 @@ LUTRAM	|84
 FF	|385
 BRAM	|1
 
-### Compress False
+### Decompress only
 
 Resource|Estimation
 --------|----------
@@ -127,7 +126,7 @@ LUTRAM	|48
 FF	|2491
 BRAM	|32.5
 
-### Compress False and LOWLUT
+### Decompress only and LOWLUT
 
 Resource|Estimation
 --------|----------
@@ -138,18 +137,18 @@ BRAM	|1
 
 ## Lattice UltraPLus
 
-### Decompress LOWLUT
+### Decompress only with LOWLUT
 
-    Number of cells:               3788
-      SB_CARRY                      448
-      SB_DFF                         41
-      SB_DFFE                       813
-      SB_DFFESR                      25
-      SB_DFFESS                       1
-      SB_LUT4                      2458
-      SB_RAM40_4K                     2
+   Number of cells:               3312
+     SB_CARRY                      511
+     SB_DFF                         41
+     SB_DFFE                       302
+     SB_DFFESR                      33
+     SB_DFFESS                      10
+     SB_LUT4                      2412
+     SB_RAM40_4K                     3
 
-### Compress LOWLUT
+### Compress
 
     Number of cells                6796
       SB_CARRY                      917
@@ -166,7 +165,7 @@ Non FAST passes timing constraints for 100 Mhz.
 
 # Future Improvements (when there is interest)
 
-* Reduce LUT usage: Try to fit in a Lattice ultra plus 5k. Because these devices have no LUT-ram the input buffer must be rewritten to use BRAM. This will reduce the LUT usage.
+* ~~Reduce cell usage: Try to fit in a Lattice ultra plus 5k. Because these devices have no LUT-ram the input buffer must be rewritten to use BRAM. This will reduce the cell usage.~~ Done for decompress.
 * ~~Improve speed from current 80Mhz to 100Mhz~~
 * ~~Improve compression performance~~
 * Handle compress input streams < 4 bytes

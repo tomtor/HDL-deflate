@@ -76,7 +76,7 @@ fast with a CPU and HDL-Deflate needs a lot of BRAM when configured to decompres
 Compression is another story because it is a LOT faster in hardware with the `FAST` option and uses a reasonable amount of LUTs.
 
 Decompression only mode with the LOWLUT option can be interesting because it also has a reasonable size (comparable
-with a soft CPU).
+with a soft CPU on Lattice and much smaller on Xilinx).
 
 # FPGA validation
 
@@ -131,10 +131,10 @@ BRAM	|32.5
 
 Resource|Estimation
 --------|----------
-LUT	|2157
-LUTRAM	|36
-FF	|858
-BRAM	|1.5
+LUT	|381
+LUTRAM	|16
+FF	|270
+BRAM	|1
 
 ## Lattice UltraPLus
 

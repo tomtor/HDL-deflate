@@ -288,9 +288,9 @@ class TestDeflate(unittest.TestCase):
 
 
         for loop in range(1):
-            # for mode in range(1,2):
+            for mode in range(1,2):
             # for mode in range(8):
-            for mode in range(6):
+            # for mode in range(6):
             # for mode in range(4):
                 self.runTests(test_decompress)
 
@@ -621,8 +621,6 @@ def test_deflate_bench(i_clk, o_led, led0_g, led1_b, led2_r):
                 led2_r.next = 0
                 i_mode.next = IDLE
                 resume.next = 1
-                """
-                """
                 tstate.next = tb_state.CPAUSE
                 # tstate.next = tb_state.HALT
 
@@ -636,6 +634,10 @@ def test_deflate_bench(i_clk, o_led, led0_g, led1_b, led2_r):
             else:
                 led0_g.next = not led0_g
                 resume.next = resume + 1
+
+        else:
+            print("test unknown state")
+            tstate.next = tb_state.RESET
 
         """
         if now() > 50000:
@@ -661,7 +663,7 @@ if 1:
     tb = test_deflate_bench(Signal(bool(0)), Signal(intbv(0)[4:]),
                             Signal(bool(0)), Signal(bool(0)), Signal(bool(0)))
     print("convert SLOWDOWN: ", SLOWDOWN)
-    tb.convert(name="test_fast_bench", initial_values=True)
+    tb.convert(name="test_fast_bench", initial_values=False)
     """
     os.system("iverilog -o test_deflate " +
               "test_fast_bench.v dump.v; " +

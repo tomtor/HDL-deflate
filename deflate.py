@@ -22,8 +22,8 @@ LOWLUT = True
 LOWLUT = False
 
 # set options manually
-COMPRESS = False
 COMPRESS = True
+COMPRESS = False
 
 DECOMPRESS = False
 DECOMPRESS = True
@@ -235,7 +235,7 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
     isize = Signal(intbv()[LMAX:])
     state = Signal(d_state.IDLE)
     method = Signal(intbv()[3:])
-    prev_method = Signal(intbv(3)[2:])
+    prev_method = Signal(intbv()[2:])
     final = Signal(bool())
 
     do_compress = Signal(bool())
@@ -246,14 +246,13 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
     b_numCodeLength = Signal(intbv()[9:])
 
     CodeLengths = 19
+    copy_i = Signal(intbv()[LOBSIZE:])
     if DYNAMIC:
         MaxCodeLength = 15
         InstantMaxBit = 10
-        copy_i = Signal(intbv()[LOBSIZE:])
     else:
         MaxCodeLength = 9
         InstantMaxBit = 9
-        copy_i = Signal(intbv()[LOBSIZE:])
 
     EndOfBlock = 256
     MaxBitLength = 288
@@ -295,9 +294,9 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
     leaf = Signal(intbv()[CODEBITS + BITBITS:])
 
     minBits = Signal(intbv()[5:])
-    maxBits = Signal(intbv(9)[5:])
+    maxBits = Signal(intbv()[5:])
     d_maxBits = Signal(intbv()[5:])
-    instantMaxBit = Signal(intbv(9)[InstantMaxBit:])
+    instantMaxBit = Signal(intbv()[InstantMaxBit:])
     d_instantMaxBit = Signal(intbv()[InstantMaxBit:])
     instantMask = Signal(intbv()[MaxCodeLength:])
     d_instantMask = Signal(intbv()[MaxCodeLength:])
@@ -616,6 +615,9 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
 
                 elif DECOMPRESS and i_mode == STARTD:
 
+                    maxBits.next = 9
+                    instantMaxBit.next = 9
+                    prev_method.next = 3
                     do_compress.next = False
                     o_done.next = False
                     o_iprogress.next = 0

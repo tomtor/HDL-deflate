@@ -101,7 +101,7 @@ class TestDeflate(unittest.TestCase):
             print("START TEST MODE", mode, tloop)
             print("==========================")
 
-            b_data, zl_data = test_data(mode, 25000 if not LOWLUT else 1000)
+            b_data, zl_data = test_data(mode, 2500 if not LOWLUT else 1000)
 
             if mode == 0:
                 reset.next = 0

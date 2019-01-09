@@ -18,8 +18,8 @@ from myhdl import always, block, Signal, intbv, Error, ResetSignal, \
 IDLE, RESET, WRITE, READ, STARTC, STARTD = range(6)
 
 # Trade speed and functionality (DYNAMIC trees) for LUTs
-LOWLUT=True
-LOWLUT=False
+LOWLUT = True
+LOWLUT = False
 
 # set options manually
 COMPRESS = False
@@ -253,12 +253,10 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
     else:
         MaxCodeLength = 9
         InstantMaxBit = 9
-        # copy_i = Signal(intbv()[15:])
         copy_i = Signal(intbv()[LOBSIZE:])
 
     EndOfBlock = 256
     MaxBitLength = 288
-    # MaxToken = 285
     InvalidToken = 300
 
     CODEBITS = MaxCodeLength
@@ -274,17 +272,12 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
 
     if DECOMPRESS:
         if DYNAMIC:
-            # leaves = [Signal(intbv()[CODEBITS + BITBITS:]) for _ in range(16384)]
             leaves = [Signal(intbv()[CODEBITS + BITBITS:]) for _ in range(32768)]
             d_leaves = [Signal(intbv()[CODEBITS + BITBITS:]) for _ in range(4096)]
         else:
-            if DYNAMIC:
-                leaves = [Signal(intbv()[CODEBITS + BITBITS:]) for _ in range(512)]
-            else:
-                # leaves = [Signal(intbv(v)[CODEBITS + BITBITS:]) for v in stat_leaves]
-                leaves = [Signal(bool())]
+            leaves = [Signal(bool())]
             d_leaves = [Signal(bool())]
-        # d_leaves = [Signal(intbv()[CODEBITS + BITBITS:]) for _ in range(32768)]
+        stat_leaf = Signal(intbv()[CODEBITS + BITBITS:])
     else:
         leaves = [Signal(bool())]
         d_leaves = [Signal(bool())]
@@ -401,7 +394,6 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
         @always(clk.posedge)
         def bramread():
             orbyte.next = oram[oraddr]
-            rleaf.next = stat_leaves[lraddr]
             drleaf.next = d_leaves[dlraddr]
 
     @block
@@ -1392,9 +1384,11 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
                     # print("INIT:", di, dio, instantMaxBit, maxBits)
                     cto = get4(0, maxBits)
                     mask = (1 << instantMaxBit) - 1
-                    lraddr.next = (cto & mask)
                     if DYNAMIC:
+                        lraddr.next = (cto & mask)
                         filled.next = False
+                    else:
+                        stat_leaf.next = stat_leaves[cto & mask]
                     # print(cto & mask)
                     # leaf.next = leaves[cto & mask]
                     cur_next.next = instantMaxBit + 1
@@ -1409,20 +1403,16 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
                     filled.next = False
                     cur_next.next = cur_next + 1
                 else:
+                    the_leaf = rleaf
+                    if not DYNAMIC:
+                        the_leaf = stat_leaf
                     # if get_bits(leaf) < 1:
                     # print(di, do, rleaf)
-                    if get_bits(rleaf) < 1:
+                    if get_bits(the_leaf) < 1:
                         print("< 1 bits: ")
                         raise Error("< 1 bits: ")
-                    #adv(get_bits(leaf))
-                    adv(get_bits(rleaf))
-                    """
-                    if get_code(leaf) == 0:
-                        print("leaf 0", di, isize)
-                    """
-                    #code.next = get_code(leaf)
-                    code.next = get_code(rleaf)
-                    # print("ADV:", di, get_bits(leaf), get_code(leaf))
+                    adv(get_bits(the_leaf))
+                    code.next = get_code(the_leaf)
                     if DYNAMIC and method == 2:
                         state.next = d_state.READBL
                     else:
@@ -1523,7 +1513,7 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
                     print("NO EOF ", di)
                     raise Error("NO EOF!")
                 elif code == EndOfBlock:
-                    print("EOF:", di, do)
+                    print("EOF:", isize, di, do)
                     if not ONEBLOCK and not final:
                         state.next = d_state.HEADER
                         filled.next = False

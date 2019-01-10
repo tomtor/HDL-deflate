@@ -67,6 +67,8 @@ if FAST:
 else:
     IBSIZE = 2 * CWINDOW   # Minimal window
 
+print("IBSIZE", IBSIZE)
+
 # Size of progress and I/O counters
 if LOWLUT:
     LMAX = 16
@@ -280,10 +282,10 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
         else:
             leaves = [Signal(bool())]
             d_leaves = [Signal(bool())]
-        stat_leaf = Signal(intbv()[CODEBITS + BITBITS:])
     else:
         leaves = [Signal(bool())]
         d_leaves = [Signal(bool())]
+    stat_leaf = Signal(intbv()[CODEBITS + BITBITS:])
 
     lwaddr = Signal(intbv()[MaxCodeLength:])
     lraddr = Signal(intbv()[MaxCodeLength:])
@@ -337,6 +339,8 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
     dio = Signal(intbv()[3:])
     do = Signal(intbv()[LMAX:])
     doo = Signal(intbv()[3:])
+
+    wtick = Signal(bool())
 
     b1 = Signal(intbv()[8:])
     b2 = Signal(intbv()[8:])
@@ -450,9 +454,7 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
                                         | (b15 >> (40 - shift)))
 
                 # print("old di fcount", old_di, di, fcount)
-                #Ja dat heb ik er zin iniraddr.next = di
-
-                #print("irbyte read", di, fcount, isize, irbyte)
+                # print("irbyte read", di, fcount, isize, irbyte)
 
                 if not LOWLUT:
                     b1.next = iram[di & IBS]
@@ -739,6 +741,8 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
                     pass
                 elif not FAST and not filled:
                     filled.next = True
+                elif LOWLUT and fcount == 0:
+                    pass
                 elif cur_cstatic == 0:
                     flush.next = False
                     ob1.next = 0
@@ -764,7 +768,7 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
                 elif di >= isize - 10 and i_mode != IDLE:
                     print("P", di, isize)
                     pass
-                elif di > isize + 3:
+                elif di > isize:
                     if cur_cstatic == 3:
                         cur_cstatic.next = 4
                         print("Put EOF", do)
@@ -817,9 +821,9 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
                         print(cur_cstatic, isize)
                         raise Error("???")
                 else:
-                    bdata = b1
-                    if FAST:
-                        bdata = iram[di & IBS]
+                    # print("fcount", fcount)
+                    # bdata = b1
+                    bdata = iram[di & IBS]
                     o_iprogress.next = di
                     adler1_next = (adler1 + bdata) % 65521
                     adler1.next = adler1_next
@@ -827,7 +831,7 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
                     ladler1.next = adler1_next
                     # print("in: ", bdata, di, isize)
                     state.next = d_state.SEARCH
-                    cur_search.next = di - 1  # & IBS
+                    cur_search.next = di - 1
 
             elif state == d_state.DISTANCE:
 

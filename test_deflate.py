@@ -388,6 +388,7 @@ def test_deflate_bench(i_clk, o_led, led0_g, led1_b, led2_r):
             led1_b.next = 0
             led2_r.next = 0
             tbi.next = 0
+            wtick.next = 0
             tstate.next = tb_state.START
 
         elif SLOWDOWN > 2 and scounter != 0:
@@ -542,10 +543,11 @@ def test_deflate_bench(i_clk, o_led, led0_g, led1_b, led2_r):
                 i_raddr.next = 0
                 i_mode.next = READ
                 if not DECOMPRESS:
-                    if o_oprogress == 0x26:  # for CWINDOW = 32
-                        tstate.next = tb_state.CPAUSE
-                        resume.next = 1
-                        print("compress OK!")
+                    if (o_oprogress == 0x2a        # for CWINDOW = 32
+                        or o_oprogress == 0x10f):  # for CWINDOW = 256
+                            tstate.next = tb_state.CPAUSE
+                            resume.next = 1
+                            print("compress OK!")
                     else:
                         print("compress len FAILED", o_oprogress)
                         tstate.next = tb_state.FAIL

@@ -112,7 +112,7 @@ class TestDeflate(unittest.TestCase):
                 yield delay(5)
 
             if DECOMPRESS:
-                print("==========STREAMING DECOMPRESS TEST=========")
+                print("=========== STREAMING DECOMPRESS TEST ===========")
 
                 print("STREAM LENGTH", len(zl_data))
 
@@ -194,7 +194,7 @@ class TestDeflate(unittest.TestCase):
                 print("Decompress OK!")
 
             if COMPRESS:
-                print("==========STREAMING COMPRESS TEST=========")
+                print("=========== STREAMING COMPRESS TEST ===========")
 
                 print("CLEAR OLD INPUT")
                 i_mode.next = WRITE

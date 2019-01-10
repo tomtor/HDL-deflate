@@ -25,11 +25,11 @@ LOWLUT = False
 COMPRESS = False
 COMPRESS = True
 
-DECOMPRESS = False
 DECOMPRESS = True
+DECOMPRESS = False
 
-DYNAMIC = False
 DYNAMIC = True
+DYNAMIC = False
 
 MATCH10 = False
 MATCH10 = True
@@ -42,9 +42,10 @@ ONEBLOCK = False
 
 if LOWLUT:
     if COMPRESS:
-        raise Error("compress cannot be combined with LOWLUT")
+        # raise Error("compress cannot be combined with LOWLUT")
+        pass
     DYNAMIC = False
-    # MATCH10 = False
+    MATCH10 = False
     FAST = False
     ONEBLOCK = True
 
@@ -231,7 +232,6 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
 
     oaddr = Signal(modbv()[LOBSIZE:])
     oraddr = Signal(modbv()[LOBSIZE:])
-    iraddr = Signal(modbv()[LIBSIZE:])
     obyte = Signal(intbv()[8:])
     orbyte = Signal(intbv()[8:])
     irbyte = Signal(intbv()[8:])
@@ -340,8 +340,6 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
     do = Signal(intbv()[LMAX:])
     doo = Signal(intbv()[3:])
 
-    wtick = Signal(bool())
-
     b1 = Signal(intbv()[8:])
     b2 = Signal(intbv()[8:])
     b3 = Signal(intbv()[8:])
@@ -392,18 +390,20 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
             leaves[lwaddr].next = wleaf
         d_leaves[dlwaddr].next = dwleaf
 
+    @always(clk.posedge)
+    def bramread():
+        orbyte.next = oram[oraddr]
+        drleaf.next = d_leaves[dlraddr]
+
     if DYNAMIC:
         @always(clk.posedge)
-        def bramread():
-            orbyte.next = oram[oraddr]
+        def rleafread():
             rleaf.next = leaves[lraddr]
-            drleaf.next = d_leaves[dlraddr]
-    else:
+
+    if LOWLUT:
         @always(clk.posedge)
-        def bramread():
-            orbyte.next = oram[oraddr]
+        def iramread():
             irbyte.next = iram[di + rcount & IBS]
-            drleaf.next = d_leaves[dlraddr]
 
     @block
     def matcher3(o_m, mi):
@@ -472,7 +472,7 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
                     else:
                         nb.next = True
 
-                    rb = irbyte # iram[di + fcount & IBS]
+                    rb = irbyte
                     if LOWLUT:
                         fcount.next = rcount
                         if rcount == 1:
@@ -964,6 +964,9 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
 
                 if not COMPRESS:
                     pass
+                elif not FAST and not filled:
+                    print("!")
+                    filled.next = True
                 elif LOWLUT and fcount < 3:
                     # print("SEARCH", fcount)
                     pass
@@ -990,11 +993,11 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
                                 dlength.next = fmatch
                                 state.next = d_state.SEARCHF
 
-                        elif not FAST and iram[cur_search & IBS] == b1 and \
+                        elif iram[cur_search & IBS] == b1 and \
                                 iram[cur_search + 1 & IBS] == b2 and \
                                 iram[cur_search + 2 & IBS] == b3:
-                                more.next = 4
-                                state.next = d_state.SEARCH10
+                            more.next = 4
+                            state.next = d_state.SEARCH10
 
                         else:
                             cur_search.next = cur_search - 1

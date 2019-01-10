@@ -25,11 +25,11 @@ LOWLUT = False
 COMPRESS = False
 COMPRESS = True
 
-DECOMPRESS = True
 DECOMPRESS = False
+DECOMPRESS = True
 
-DYNAMIC = True
 DYNAMIC = False
+DYNAMIC = True
 
 MATCH10 = False
 MATCH10 = True
@@ -42,7 +42,7 @@ ONEBLOCK = False
 
 if LOWLUT:
     if COMPRESS:
-        # raise Error("compress cannot be combined with LOWLUT")
+        raise Error("compress cannot be combined with LOWLUT")
         pass
     DYNAMIC = False
     MATCH10 = False
@@ -388,17 +388,17 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
         oram[oaddr].next = obyte
         if DYNAMIC:
             leaves[lwaddr].next = wleaf
-        d_leaves[dlwaddr].next = dwleaf
+            d_leaves[dlwaddr].next = dwleaf
 
     @always(clk.posedge)
     def bramread():
         orbyte.next = oram[oraddr]
-        drleaf.next = d_leaves[dlraddr]
 
     if DYNAMIC:
         @always(clk.posedge)
         def rleafread():
             rleaf.next = leaves[lraddr]
+            drleaf.next = d_leaves[dlraddr]
 
     if LOWLUT:
         @always(clk.posedge)
@@ -466,13 +466,14 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
                     if fcount < 9:
                         print("fcount", fcount)
                     """
+                    rb = irbyte
                     if LOWLUT:
                         if fcount >= 4:
                             nb.next = True
                     else:
+                        rb = iram[di+fcount & IBS]
                         nb.next = True
 
-                    rb = irbyte
                     if LOWLUT:
                         fcount.next = rcount
                         if rcount == 1:
@@ -898,7 +899,10 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
 
             elif state == d_state.SEARCHF:
 
-                if FAST and COMPRESS:
+                if not (FAST and COMPRESS):
+                    pass
+                else:
+                    # print("fc", fcount)
                     lfmatch = dlength
                     distance = lfmatch + 1
                     # print("FSEARCH", distance)
@@ -964,9 +968,6 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
 
                 if not COMPRESS:
                     pass
-                elif not FAST and not filled:
-                    print("!")
-                    filled.next = True
                 elif LOWLUT and fcount < 3:
                     # print("SEARCH", fcount)
                     pass
@@ -1050,7 +1051,7 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
                     if mdone:
                         match = more - 1
                         distance = di - cur_search
-                        # print("d/l", distance, match)
+                        print("d/l", distance, match)
                         cur_dist.next = distance
                         do_init.next = True
                         # adv(match * 8)

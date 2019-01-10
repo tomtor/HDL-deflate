@@ -13,7 +13,7 @@ of a decoder from https://create.stephan-brumme.com/deflate-decoder
 from math import log2
 
 from myhdl import always, block, Signal, intbv, Error, ResetSignal, \
-    enum, always_comb, concat, ConcatSignal, modbv
+    enum, always_comb, concat, ConcatSignal, modbv, instances
 
 IDLE, RESET, WRITE, READ, STARTC, STARTD = range(6)
 
@@ -43,7 +43,6 @@ ONEBLOCK = False
 if LOWLUT:
     if COMPRESS:
         raise Error("compress cannot be combined with LOWLUT")
-        pass
     DYNAMIC = False
     MATCH10 = False
     FAST = False
@@ -1051,7 +1050,7 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
                     if mdone:
                         match = more - 1
                         distance = di - cur_search
-                        print("d/l", distance, match)
+                        # print("d/l", distance, match)
                         cur_dist.next = distance
                         do_init.next = True
                         # adv(match * 8)
@@ -1659,10 +1658,7 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
                 print("unknown state?!")
                 state.next = d_state.IDLE
 
-    if FAST:
-        return io_logic, logic, fill_buf, bramwrite, bramread, matchers
-    else:
-        return io_logic, logic, fill_buf, bramwrite, bramread
+    return instances()
 
 
 if __name__ == "__main__":

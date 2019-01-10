@@ -17,7 +17,7 @@ icarus: test_fast_bench.v
 	vvp test_deflate
 
 yosys:
-	mv test40.log test40.old.log
+	-mv test40.log test40.old.log
 	sed -e '/disable MYHDL/d' -e '/\$$finish/d' < test_deflate_bench.v > test40.v
 	yosys -p "synth_ice40 -blif test40.blif" test40.v 2>&1 > test40.log
 	tail -20 test40.log

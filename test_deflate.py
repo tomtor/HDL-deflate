@@ -95,7 +95,8 @@ class TestDeflate(unittest.TestCase):
           def tick():
               clk.next = not clk
 
-          for tloop in range(2):
+          for tloop in range(1):
+
             print("")
             print("==========================")
             print("START TEST MODE", mode, tloop)
@@ -288,7 +289,7 @@ class TestDeflate(unittest.TestCase):
 
 
         for loop in range(1):
-            # for mode in range(1,2):
+            # for mode in range(3,8):
             # for mode in range(8):
             for mode in range(6):
             # for mode in range(4):

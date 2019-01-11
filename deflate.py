@@ -298,11 +298,11 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
 
     leaf = Signal(intbv()[CODEBITS + BITBITS:])
 
-    minBits = Signal(intbv()[5:])
-    maxBits = Signal(intbv()[5:])
-    d_maxBits = Signal(intbv()[5:])
-    instantMaxBit = Signal(intbv()[InstantMaxBit:])
-    d_instantMaxBit = Signal(intbv()[InstantMaxBit:])
+    minBits = Signal(intbv()[4:])
+    maxBits = Signal(intbv()[4:])
+    d_maxBits = Signal(intbv()[4:])
+    instantMaxBit = Signal(intbv()[4:])
+    d_instantMaxBit = Signal(intbv()[4:])
     instantMask = Signal(intbv()[MaxCodeLength:])
     d_instantMask = Signal(intbv()[MaxCodeLength:])
     spread = Signal(intbv()[InstantMaxBit:])
@@ -1605,6 +1605,7 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
                         obyte.next = b3
                         # adv(8)
                         di.next = di + 1
+                        filled.next = False
                         o_iprogress.next = di
                         cur_i.next = cur_i + 1
                         do.next = do + 1

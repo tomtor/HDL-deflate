@@ -5,7 +5,7 @@ This design is implemented in MyHDL (www.myhdl.org) and can be translated to Ver
 
 It has been verified in [Icarus](http://iverilog.icarus.com/),
 [Xilinx Vivado](https://www.xilinx.com/products/design-tools/vivado.html)
-and on a physical Xilinx device ([Digilent Arty](https://store.digilentinc.com/arty-a7-artix-7-fpga-development-board-for-makers-and-hobbyists/).
+and on a physical Xilinx device ([Digilent Arty](https://store.digilentinc.com/arty-a7-artix-7-fpga-development-board-for-makers-and-hobbyists/)).
 
 In addition it has been tested with [Lattice iCE40 UltraPlus](https://www.latticesemi.com/Products/FPGAandCPLD/iCE40UltraPlus)
 using [IceStorm](http://www.clifford.at/icestorm/) and an

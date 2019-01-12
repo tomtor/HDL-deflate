@@ -1,5 +1,5 @@
 # HDL-deflate
-FPGA implementation of deflate (de)compress RFC 1950/1951 ((g)zip / zlib)
+[FPGA](https://en.m.wikipedia.org/wiki/Field-programmable_gate_array) implementation of [deflate](https://en.m.wikipedia.org/wiki/DEFLATE) (de)compress RFC 1950/1951 ((g)zip / zlib)
 
 This design is implemented in MyHDL (www.myhdl.org) and can be translated to Verilog or VHDL.
 

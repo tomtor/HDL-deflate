@@ -1144,18 +1144,22 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
                         adv(n_adv)
 
                     state.next = d_state.REPEAT
-                else:
-                    print("FILL UP")
 
-                    for dbl_i in range(32):
-                        dbl = 0
-                        if dbl_i + numLiterals < numCodeLength:
-                            dbl = int(codeLength[dbl_i + numLiterals])
-                        # print("dbl:", dbl)
-                        distanceLength[dbl_i].next = dbl
+                    spread_i.next = 0
+
+                elif spread_i < 32:
+                    if spread_i == 0:
+                        print("FILL UP")
+
+                    dbl = 0
+                    if spread_i + numLiterals < numCodeLength:
+                        dbl = int(codeLength[spread_i + numLiterals])
+                    distanceLength[spread_i].next = dbl
 
                     # print(numCodeLength, numLiterals, MaxBitLength)
+                    spread_i.next = spread_i + 1
 
+                else:
                     cur_i.next = numLiterals
                     state.next = d_state.INIT3
 

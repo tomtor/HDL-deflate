@@ -3,7 +3,13 @@ FPGA implementation of deflate (de)compress RFC 1950/1951 ((g)zip / zlib)
 
 This design is implemented in MyHDL (www.myhdl.org) and can be translated to Verilog or VHDL.
 
-It has been verified in Icarus, Xilinx Vivado and on a physical Xilinx device (Digilent Arty).
+It has been verified in [Icarus](http://iverilog.icarus.com/),
+[Xilinx Vivado](https://www.xilinx.com/products/design-tools/vivado.html)
+and on a physical Xilinx device ([Digilent Arty](https://store.digilentinc.com/arty-a7-artix-7-fpga-development-board-for-makers-and-hobbyists/).
+
+In addition it has been tested with [Lattice iCE40 UltraPlus](https://www.latticesemi.com/Products/FPGAandCPLD/iCE40UltraPlus)
+using [IceStorm](http://www.clifford.at/icestorm/) and an
+[Upduino](http://www.latticesemi.com/en/Products/DevelopmentBoardsAndKits/GnarlyGreyUPDuinoBoard).
 
 Usage should be clear from the test bench in `test_deflate.py`.
 
@@ -85,10 +91,10 @@ Decompression only mode with the LOWLUT option can be interesting because it als
 
 Resource|Estimation
 --------|----------
-LUT	|11009
+LUT	|9823
 LUTRAM	|1248
-FF	|3018
-BRAM	|33
+FF	|2910
+BRAM	|18
 
 ### Compress only and FAST and MATCH10
 
@@ -121,10 +127,10 @@ BRAM	|1
 
 Resource|Estimation
 --------|----------
-LUT	|5779
+LUT	|4752
 LUTRAM	|48
-FF	|2491
-BRAM	|32.5
+FF	|2443
+BRAM	|17.5
 
 ### Decompress only and LOWLUT
 

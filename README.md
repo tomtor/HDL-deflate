@@ -11,6 +11,8 @@ In addition it has been tested with [Lattice iCE40 UltraPlus](https://www.lattic
 using [IceStorm](http://www.clifford.at/icestorm/) and an
 [Upduino](http://www.latticesemi.com/en/Products/DevelopmentBoardsAndKits/GnarlyGreyUPDuinoBoard).
 
+Also on an [ECP5 board](http://www.latticesemi.com/en/Products/DevelopmentBoardsAndKits/ECP5EvaluationBoard) with [Lattice Diamond](http://www.latticesemi.com/latticediamond) on [Ubunti 18.04](http://releases.ubuntu.com/18.04/).
+
 Usage should be clear from the test bench in `test_deflate.py`.
 
 # Tunable parameters
@@ -140,6 +142,21 @@ LUT	|712
 LUTRAM	|24
 FF	|330
 BRAM	|1
+
+## Lattice ECP5 (LFE5UM5G-85F)
+
+### Default setting
+
+   Number of registers:   3108 out of 84255 (4%)
+      PFU registers:         3108 out of 83640 (4%)
+      PIO registers:            0 out of   615 (0%)
+   Number of SLICEs:     12491 out of 41820 (30%)
+      SLICEs as Logic/ROM:  10955 out of 41820 (26%)
+      SLICEs as RAM:         1536 out of 31365 (5%)
+      SLICEs as Carry:       1276 out of 41820 (3%)
+   Number of LUT4s:        21678 out of 83640 (26%)
+      Number used as logic LUTs:        16054
+      Number used as distributed RAM:   3072
 
 ## Lattice UltraPLus
 

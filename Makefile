@@ -22,10 +22,6 @@ yosys:
 	yosys -p "synth_ice40 -blif test40.blif" test40.v 2>&1 > test40.log
 	tail -20 test40.log
 
-pico:
-	yosys -p "synth_ice40 -blif test40.blif" picorv32.v 2>&1 > test40.log
-	tail -25 test40.log
-
 place:
 	#arachne-pnr -d 5k -P sg48 -p upduino_v2.pcf chip.blif -o chip.txt
 	arachne-pnr -d 5k -P sg48 test40.blif -o test40.txt

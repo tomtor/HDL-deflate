@@ -1674,3 +1674,4 @@ if __name__ == "__main__":
                 Signal(modbv()[LIBSIZE:]), Signal(modbv()[LBSIZE:]),
                 Signal(bool(0)), ResetSignal(1, 0, True))
     d.convert(initial_values=False)
+    d.convert(initial_values=False,hdl='VHDL')

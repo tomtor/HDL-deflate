@@ -105,10 +105,10 @@ class TestDeflate(unittest.TestCase):
             b_data, zl_data = test_data(mode, 2500 if not LOWLUT else 1000)
 
             if mode == 0:
-                reset.next = 0
+                reset.next = 1
                 tick()
                 yield delay(5)
-                reset.next = 1
+                reset.next = 0
                 tick()
                 yield delay(5)
 
@@ -309,7 +309,7 @@ class TestDeflate(unittest.TestCase):
         i_raddr = Signal(modbv()[LMAX:])
 
         clk = Signal(bool(0))
-        reset = ResetSignal(1, 0, True)
+        reset = ResetSignal(0, 1, True)
 
         dut = deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress,
                       o_byte, i_waddr, i_raddr, clk, reset)
@@ -342,7 +342,7 @@ def test_deflate_bench(i_clk, o_led, led0_g, led1_b, led2_r):
     i_waddr = Signal(modbv()[LMAX:])
     i_raddr = Signal(modbv()[LMAX:])
 
-    reset = ResetSignal(1, 0, True)
+    reset = ResetSignal(0, 1, True)
 
     dut = deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress,
                   o_byte, i_waddr, i_raddr, i_clk, reset)
@@ -384,7 +384,7 @@ def test_deflate_bench(i_clk, o_led, led0_g, led1_b, led2_r):
 
         if tstate == tb_state.RESET:
             print("RESET", counter)
-            reset.next = 0
+            reset.next = 1
             led0_g.next = 0
             led1_b.next = 0
             led2_r.next = 0
@@ -400,7 +400,7 @@ def test_deflate_bench(i_clk, o_led, led0_g, led1_b, led2_r):
             if tbi < 1:
                 tbi.next = tbi.next + 1
             else:
-                reset.next = 1
+                reset.next = 0
                 if DECOMPRESS:
                     tstate.next = tb_state.WRITE
                 else:

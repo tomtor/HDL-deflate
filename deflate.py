@@ -422,7 +422,7 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
 
     @always(clk.posedge)
     def fill_buf():
-        if not reset:
+        if reset:
             print("FILL RESET")
             nb.next = 0
         else:
@@ -606,7 +606,7 @@ def deflate(i_mode, o_done, i_data, o_iprogress, o_oprogress, o_byte,
 
     @always(clk.posedge)
     def logic():
-        if not reset:
+        if reset:
             print("DEFLATE RESET")
             state.next = d_state.IDLE
             o_done.next = False
@@ -1674,4 +1674,5 @@ if __name__ == "__main__":
                 Signal(modbv()[LIBSIZE:]), Signal(modbv()[LBSIZE:]),
                 Signal(bool(0)), ResetSignal(1, 0, True))
     d.convert(initial_values=False)
-    d.convert(initial_values=False,hdl='VHDL')
+    # VHDL output is broken
+    # d.convert(initial_values=False,hdl='VHDL')

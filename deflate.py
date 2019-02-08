@@ -15,7 +15,7 @@ from math import log2
 from myhdl import always, block, Signal, intbv, Error, ResetSignal, \
     enum, always_comb, concat, ConcatSignal, modbv, instances
 
-IDLE, WRITE, READ, STARTC, STARTD = range(6)
+IDLE, WRITE, READ, STARTC, STARTD = range(5)
 
 # Trade speed and functionality (DYNAMIC trees) for LUTs
 LOWLUT = True

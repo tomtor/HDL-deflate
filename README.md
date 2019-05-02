@@ -18,7 +18,7 @@ Usage should be clear from the test bench in `test_deflate.py`.
 # Tunable parameters
 
     OBSIZE = 8192   # Size of output buffer (BRAM)
-                    # You need 32768 to compress ALL valid deflate streams!
+                    # You need 32768 to decompress ALL valid deflate streams!
 
     IBSIZE = 2048   # Size of input buffer (LUT-RAM)
 
